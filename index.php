@@ -58,25 +58,25 @@
                                 </p>
                                 
                                 <div class="dropdown-content" id="dropdown-<?php echo $hotel['id']; ?>">
-                                    <div class="price-comparison">
-                                        <h4>Price Comparison</h4>
-                                        <ul class="price-list">
-                                            <?php foreach ($hotel['prices'] as $site => $price): ?>
-                                                <li>
-                                                    <span class="site-name"><?php echo $site; ?></span>
-                                                    <span class="price-tag">$<?php echo $price; ?></span>
-                                                    <a href="#" class="view-btn">View Deal</a>
-                                                </li>
-                                            <?php endforeach; ?>
-                                        </ul>
-                                    </div>
-                                    <div class="competitors-section">
-                                        <button class="btn btn-secondary comp-btn" 
-                                                data-competitors='<?php echo htmlspecialchars(json_encode($hotel['competitors']), ENT_QUOTES, 'UTF-8'); ?>'
-                                                onclick="handleCompetitorClick(this)">
-                                            <i class="ph-users-three"></i>
-                                            View Competitor Hotels
-                                        </button>
+                                    <div class="comparison-grid">
+                                        <div class="price-comparison">
+                                            <h4>Current Market Prices</h4>
+                                            <ul class="price-list">
+                                                <!-- Populated by JS -->
+                                            </ul>
+                                        </div>
+                                        <div class="competitor-comparison">
+                                            <div class="competitors-sidebar">
+                                                <h4><i class="ph-users-three"></i> Close Competitors</h4>
+                                                <div class="comp-mini-list">
+                                                    <!-- Populated by JS -->
+                                                </div>
+                                                <button class="btn btn-secondary comp-btn-full" 
+                                                        onclick="handleCompetitorClick(this)">
+                                                    View Market Analysis
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -84,6 +84,29 @@
                     <?php endforeach; ?>
                 </div>
             </div>
+        <section class="market-intelligence">
+             <div class="container">
+                <div class="intel-card">
+                    <div class="intel-header">
+                        <h2><i class="ph-chart-line-up-fill"></i> Market Intelligence Overview</h2>
+                        <p>Real-time performance tracking of Top 10 Industry competitors within 20km.</p>
+                    </div>
+                    <div class="intel-grid">
+                        <div class="intel-item">
+                            <span class="intel-label">Total Competitors Tracked</span>
+                            <span class="intel-value">40+ Properties</span>
+                        </div>
+                        <div class="intel-item">
+                            <span class="intel-label">Market Sync Frequency</span>
+                            <span class="intel-value">60 Seconds</span>
+                        </div>
+                        <div class="intel-item">
+                            <span class="intel-label">Scanning Intensity</span>
+                            <span class="intel-value">14+ Global Sources</span>
+                        </div>
+                    </div>
+                </div>
+             </div>
         </section>
     </main>
 
@@ -91,7 +114,10 @@
     <div id="comp-modal" class="modal">
         <div class="modal-content">
             <span class="close-modal">&times;</span>
-            <h2>Nearby Competitor Hotels</h2>
+            <div class="modal-header">
+                <h2>Top 10 Market Competitors</h2>
+                <span class="modal-subtitle">Direct competitors within a 20km radius</span>
+            </div>
             <div id="competitor-list" class="competitor-grid">
                 <!-- Competitors will show up here -->
             </div>

@@ -24,12 +24,13 @@ function updatePricesInUI() {
         const card = document.getElementById(`hotel-${hotel.id}`);
         if (!card) return;
 
-        // Update each site's price in the dropdown
+        // Update each site's price in the main grid
         const priceList = card.querySelector('.price-list');
         priceList.innerHTML = '';
         
         for (const [site, price] of Object.entries(hotel.live_prices)) {
             const li = document.createElement('li');
+            li.setAttribute('data-site', site);
             li.innerHTML = `
                 <span class="site-name">${site}</span>
                 <span class="price-tag">$${price} <small class="live-pulse">LIVE</small></span>
@@ -38,11 +39,26 @@ function updatePricesInUI() {
             priceList.appendChild(li);
         }
 
+        // Update competitor mini-list
+        const compList = card.querySelector('.comp-mini-list');
+        if (compList) {
+            compList.innerHTML = '';
+            hotel.competitors.forEach(comp => {
+                const item = document.createElement('div');
+                item.className = 'comp-mini-item';
+                item.innerHTML = `
+                    <span class="comp-mini-name">${comp.name}</span>
+                    <span class="comp-mini-price">$${comp.current_price}</span>
+                `;
+                compList.appendChild(item);
+            });
+        }
+
         // Add a visual indicator for live data if not present
         if (!card.querySelector('.live-status')) {
             const status = document.createElement('div');
             status.className = 'live-status';
-            status.innerHTML = '<span class="pulse-dot"></span> Real-time prices';
+            status.innerHTML = '<span class="pulse-dot"></span> Real-time prices synced';
             card.querySelector('.hotel-image').appendChild(status);
         }
     });
@@ -135,7 +151,7 @@ window.addEventListener('click', (event) => {
 document.addEventListener('DOMContentLoaded', () => {
     fetchLivePrices();
     
-    // Refresh prices every 30 seconds for simulation effect
-    setInterval(fetchLivePrices, 30000);
+    // Refresh prices every 60 seconds for simulation effect
+    setInterval(fetchLivePrices, 60000);
 });
 
