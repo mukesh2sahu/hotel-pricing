@@ -147,6 +147,98 @@ window.addEventListener('click', (event) => {
     }
 });
 
+/**
+ * Open the Rate Shopper comparison table for a specific hotel.
+ * @param {number} hotelId - The ID of the hotel to analyze.
+ */
+function openRateShopper(hotelId) {
+    const hotel = hotelLiveData.find(h => h.id === hotelId);
+    if (!hotel) return;
+
+    const section = document.getElementById('rate-shopper-section');
+    const hotelNameElem = document.getElementById('shopper-hotel-name');
+    const theadRow = document.getElementById('shopper-thead-row');
+    const tbody = document.getElementById('shopper-tbody');
+
+    hotelNameElem.innerText = `Rate Shopper - ${hotel.name}`;
+    
+    // Clear previous table content
+    theadRow.innerHTML = '<th>OTA Name</th>';
+    tbody.innerHTML = '';
+
+    // Define OTAs
+    const OTAs = [
+        "Hotel Website", "Agoda", "Expedia", "Booking.com", "MMT", 
+        "Goibibo", "Trip.com", "Ticket.com", "Traveloka", "Hotels.com", 
+        "Airbnb", "Hotelbeds.com", "Tripadvisor", "12go.asia"
+    ];
+
+    // Create Table Header: Main Hotel + Top 7 Competitors
+    const mainHotelHeader = document.createElement('th');
+    mainHotelHeader.innerText = 'Main Hotel';
+    mainHotelHeader.className = 'main-hotel-col';
+    theadRow.appendChild(mainHotelHeader);
+
+    const displayCompetitors = hotel.competitors.slice(0, 7);
+    displayCompetitors.forEach((comp, index) => {
+        const th = document.createElement('th');
+        th.innerText = comp.name; // Show the actual competitor name
+        th.className = 'comp-header';
+        theadRow.appendChild(th);
+    });
+
+    // Populate Table Rows
+    OTAs.forEach(ota => {
+        const tr = document.createElement('tr');
+        
+        // OTA Name Cell
+        const otaNameCell = document.createElement('td');
+        otaNameCell.className = 'ota-name-cell';
+        otaNameCell.innerText = ota;
+        tr.appendChild(otaNameCell);
+
+        // Main Hotel Price for this OTA
+        const mainPriceCell = document.createElement('td');
+        mainPriceCell.className = 'main-hotel-col';
+        let basePrice = hotel.live_prices[ota] || (200 + Math.floor(Math.random() * 100));
+        mainPriceCell.innerHTML = `<span class="price-val">$${basePrice}</span>`;
+        tr.appendChild(mainPriceCell);
+
+        // Competitor Prices for this OTA
+        displayCompetitors.forEach(comp => {
+            const compPriceCell = document.createElement('td');
+            // Simulate variability across OTAs for competitors
+            let compBase = comp.current_price || (180 + Math.floor(Math.random() * 120));
+            let variance = (Math.random() * 10 - 5); // +/- $5 variance across OTAs
+            let finalPrice = Math.round(compBase + variance);
+            
+            // Highlight if cheaper than main hotel
+            if (finalPrice < basePrice) {
+                compPriceCell.className = 'price-lower';
+            } else if (finalPrice > basePrice) {
+                compPriceCell.className = 'price-higher';
+            }
+
+            compPriceCell.innerHTML = `<span class="price-val">$${finalPrice}</span>`;
+            tr.appendChild(compPriceCell);
+        });
+
+        tbody.appendChild(tr);
+    });
+
+    // Show section
+    section.style.display = 'block';
+    section.scrollIntoView({ behavior: 'smooth' });
+}
+
+/**
+ * Close the Rate Shopper section.
+ */
+function closeRateShopper() {
+    const section = document.getElementById('rate-shopper-section');
+    section.style.display = 'none';
+}
+
 // Load live data on initialization
 document.addEventListener('DOMContentLoaded', () => {
     fetchLivePrices();

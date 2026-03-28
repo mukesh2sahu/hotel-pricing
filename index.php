@@ -72,8 +72,8 @@
                                                     <!-- Populated by JS -->
                                                 </div>
                                                 <button class="btn btn-secondary comp-btn-full" 
-                                                        onclick="handleCompetitorClick(this)">
-                                                    View Market Analysis
+                                                        onclick="openRateShopper(<?php echo $hotel['id']; ?>)">
+                                                    <i class="ph-table"></i> Rate Shopper Table
                                                 </button>
                                             </div>
                                         </div>
@@ -84,6 +84,36 @@
                     <?php endforeach; ?>
                 </div>
             </div>
+        <section class="rate-shopper-section" id="rate-shopper-section" style="display: none;">
+            <div class="container">
+                <div class="rate-shopper-card">
+                    <div class="rate-shopper-header">
+                        <div class="header-info">
+                            <h2 id="shopper-hotel-name">Rate Shopper - JW Marriott</h2>
+                            <p><i class="ph-clock-fill"></i> Real-time price comparison across all major OTAs and competitors. <span class="sync-badge">Last Synced: Just now</span></p>
+                        </div>
+                        <div class="header-actions">
+                            <button class="btn btn-export"><i class="ph-file-pdf"></i> PDF</button>
+                            <button class="btn btn-export"><i class="ph-file-xls"></i> Excel</button>
+                            <button class="btn btn-primary" onclick="closeRateShopper()"><i class="ph-x"></i> Close</button>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="rate-shopper-table" id="rate-shopper-table">
+                            <thead>
+                                <tr id="shopper-thead-row">
+                                    <!-- Populated by JS -->
+                                </tr>
+                            </thead>
+                            <tbody id="shopper-tbody">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <section class="market-intelligence">
              <div class="container">
                 <div class="intel-card">

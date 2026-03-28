@@ -41,9 +41,9 @@ if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < $cacheTime && 
 }
 
 $targetSites = [
-    "Own Hotel Website", "Agoda", "Expedia", "Booking.com", "MMT", "Goibibo", 
-    "Trip.com", "Tiket.com", "Traveloka", "Hotels.com", "Airbnb", 
-    "Hotelbeds.com", "TripAdvisor", "12go.asia"
+    "Hotel Website", "Agoda", "Expedia", "Booking.com", "MMT", "Goibibo", 
+    "Trip.com", "Ticket.com", "Traveloka", "Hotels.com", "Airbnb", 
+    "Hotelbeds.com", "Tripadvisor", "12go.asia"
 ];
 
 $response = [];
@@ -71,8 +71,8 @@ foreach ($hotels as $hotel) {
             }
         }
         
-        // Ensure "Own Hotel Website" is competitive
-        $finalPrices['Own Hotel Website'] = (int)($basePrice * 0.92); // 8% cheaper
+        // Ensure "Hotel Website" is competitive
+        $finalPrices['Hotel Website'] = (int)($basePrice * 0.92); // 8% cheaper
 
         $hotelData = [
             "id" => $hotel['id'],
