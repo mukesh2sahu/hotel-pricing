@@ -179,7 +179,7 @@ function openRateShopper(hotelId) {
     mainHotelHeader.className = 'main-hotel-col';
     theadRow.appendChild(mainHotelHeader);
 
-    const displayCompetitors = hotel.competitors.slice(0, 7);
+    const displayCompetitors = hotel.competitors; // Show all available competitors
     displayCompetitors.forEach((comp, index) => {
         const th = document.createElement('th');
         th.innerText = comp.name; // Show the actual competitor name

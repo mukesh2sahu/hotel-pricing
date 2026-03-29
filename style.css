@@ -160,7 +160,7 @@ nav a:hover {
 
 .hotel-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
     gap: 2rem;
 }
 
@@ -317,7 +317,7 @@ nav a:hover {
 
 @media (min-width: 640px) {
     .comparison-grid {
-        grid-template-columns: 1.2fr 0.8fr;
+        grid-template-columns: 1.1fr 0.9fr;
     }
 }
 
@@ -342,6 +342,7 @@ nav a:hover {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    white-space: nowrap;
 }
 
 .site-name {
@@ -421,6 +422,10 @@ nav a:hover {
 .comp-mini-name {
     color: var(--text-muted);
     font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 130px;
 }
 
 .comp-mini-price {
@@ -682,7 +687,7 @@ footer {
     border-collapse: collapse;
     font-size: 0.95rem;
     table-layout: fixed;
-    min-width: 900px;
+    min-width: 1400px;
 }
 
 .rate-shopper-table th {
