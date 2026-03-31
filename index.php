@@ -15,9 +15,14 @@
     <div class="background-blobs"></div>
     <header>
         <div class="container nav-container">
-            <div class="logo">
-                <i class="ph-buildings-fill"></i>
-                <span>SkyCompare</span>
+            <div class="logo-wrapper">
+                <div class="logo">
+                    <i class="ph-buildings-fill"></i>
+                    <span>SkyCompare</span>
+                </div>
+                <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">
+                    <i class="ph-list"></i>
+                </button>
             </div>
             <nav>
                 <a href="#">Home</a>

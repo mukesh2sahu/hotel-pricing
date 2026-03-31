@@ -806,7 +806,7 @@ footer {
     }
     
     .hero h1 {
-        font-size: 3rem;
+        font-size: 2.8rem;
     }
 }
 
@@ -818,82 +818,103 @@ footer {
     
     .nav-container {
         flex-direction: column;
-        gap: 1.5rem;
+        align-items: flex-start;
+        gap: 0;
     }
     
+    .logo-wrapper {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+    
+    .mobile-menu-toggle {
+        display: block;
+        background: rgba(79, 70, 229, 0.1);
+        border: 1px solid rgba(79, 70, 229, 0.2);
+        color: var(--primary);
+        padding: 0.5rem;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 1.5rem;
+        line-height: 0;
+    }
+
     .logo {
         font-size: 1.3rem;
     }
     
     nav {
+        display: none;
         flex-direction: column;
         width: 100%;
-        gap: 1rem;
+        gap: 0.8rem;
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+        border-top: 1px solid rgba(0,0,0,0.05);
+        animation: slideDown 0.3s ease-out;
+    }
+    
+    nav.show {
+        display: flex;
+    }
+    
+    @keyframes slideDown {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
     }
     
     nav a {
-        padding: 0.5rem 0;
+        padding: 0.6rem 0.5rem;
+        border-radius: 8px;
+        background: rgba(0,0,0,0.02);
     }
     
     .currency-selector {
         width: 100%;
-        justify-content: center;
+        justify-content: space-between;
         margin-right: 0;
+        margin-bottom: 0.5rem;
     }
     
     .btn-primary {
         width: 100%;
+        padding: 0.8rem;
     }
     
     .hero {
-        padding: 3rem 0 2rem;
+        padding: 2.5rem 0 1.5rem;
     }
     
     .hero h1 {
-        font-size: 2.2rem;
-        line-height: 1.2;
+        font-size: 1.7rem;
+        line-height: 1.15;
+        margin-bottom: 0.8rem;
     }
     
     .hero p {
-        font-size: 1.1rem;
+        font-size: 1rem;
     }
     
     .hotel-grid {
         grid-template-columns: 1fr;
-    }
-    
-    .hotel-card {
-        max-width: 100%;
-    }
-    
-    .comparison-grid {
-        grid-template-columns: 1fr;
-        gap: 2rem;
-    }
-    
-    .rate-shopper-header {
-        flex-direction: column;
-        align-items: flex-start;
         gap: 1.5rem;
+    }
+    
+    .hotel-image {
+        height: 180px;
+    }
+    
+    .rate-shopper-header h2 {
+        font-size: 1.4rem;
     }
     
     .header-actions {
         width: 100%;
         flex-direction: column;
-    }
-    
-    .header-actions .btn {
-        width: 100%;
-        justify-content: center;
-    }
-    
-    .intel-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .modal-content {
-        width: 95%;
-        padding: 1.5rem;
+        gap: 0.6rem;
     }
 }
 
@@ -903,27 +924,23 @@ footer {
     }
     
     .hero h1 {
-        font-size: 1.8rem;
+        font-size: 1.5rem;
     }
     
     .hotel-name {
-        font-size: 1.2rem;
-    }
-    
-    .price-list li {
-        padding: 0.8rem;
-        font-size: 0.9rem;
-    }
-    
-    .price-tag {
-        font-size: 1rem;
+        font-size: 1.15rem;
     }
     
     .intel-card {
-        padding: 1.5rem;
+        padding: 1.5rem 1.2rem;
     }
-    
-    .intel-header h2 {
-        font-size: 1.5rem;
-    }
+}
+
+/* Base styles for new components */
+.mobile-menu-toggle {
+    display: none;
+}
+
+.logo-wrapper {
+    display: block;
 }

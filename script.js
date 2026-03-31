@@ -22,6 +22,14 @@ const currencySymbols = {
 };
 
 /**
+ * Toggle the mobile navigation menu.
+ */
+function toggleMobileMenu() {
+    const nav = document.querySelector('nav');
+    nav.classList.toggle('show');
+}
+
+/**
  * Handle currency change.
  */
 function changeCurrency(currency) {
