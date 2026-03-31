@@ -132,6 +132,44 @@ nav a:hover {
     color: var(--white);
 }
 
+/* Currency Selector Styling */
+.currency-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    background: rgba(79, 70, 229, 0.05);
+    border: 1px solid rgba(79, 70, 229, 0.1);
+    border-radius: var(--radius-md);
+    transition: all 0.3s ease;
+}
+
+.currency-selector:hover {
+    background: rgba(79, 70, 229, 0.1);
+    border-color: var(--primary);
+}
+
+.currency-selector i {
+    color: var(--primary);
+    font-size: 1.1rem;
+}
+
+.currency-selector select {
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    outline: none;
+}
+
+.currency-selector select option {
+    background: white;
+    color: var(--text-main);
+}
+
 .hero {
     padding: 4rem 0 3rem;
     text-align: center;
@@ -761,11 +799,131 @@ footer {
     font-size: 0.8rem;
 }
 
-@media (max-width: 768px) {
-    .hero h1 {
-        font-size: 2.5rem;
+/* --- MOBILE RESPONSIVENESS --- */
+@media (max-width: 1024px) {
+    .container {
+        padding: 0 1.5rem;
     }
+    
+    .hero h1 {
+        font-size: 3rem;
+    }
+}
+
+@media (max-width: 768px) {
+    header {
+        height: auto;
+        padding: 1rem 0;
+    }
+    
+    .nav-container {
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+    
+    .logo {
+        font-size: 1.3rem;
+    }
+    
     nav {
-        display: none;
+        flex-direction: column;
+        width: 100%;
+        gap: 1rem;
+    }
+    
+    nav a {
+        padding: 0.5rem 0;
+    }
+    
+    .currency-selector {
+        width: 100%;
+        justify-content: center;
+        margin-right: 0;
+    }
+    
+    .btn-primary {
+        width: 100%;
+    }
+    
+    .hero {
+        padding: 3rem 0 2rem;
+    }
+    
+    .hero h1 {
+        font-size: 2.2rem;
+        line-height: 1.2;
+    }
+    
+    .hero p {
+        font-size: 1.1rem;
+    }
+    
+    .hotel-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .hotel-card {
+        max-width: 100%;
+    }
+    
+    .comparison-grid {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+    }
+    
+    .rate-shopper-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1.5rem;
+    }
+    
+    .header-actions {
+        width: 100%;
+        flex-direction: column;
+    }
+    
+    .header-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .intel-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .modal-content {
+        width: 95%;
+        padding: 1.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .container {
+        padding: 0 1rem;
+    }
+    
+    .hero h1 {
+        font-size: 1.8rem;
+    }
+    
+    .hotel-name {
+        font-size: 1.2rem;
+    }
+    
+    .price-list li {
+        padding: 0.8rem;
+        font-size: 0.9rem;
+    }
+    
+    .price-tag {
+        font-size: 1rem;
+    }
+    
+    .intel-card {
+        padding: 1.5rem;
+    }
+    
+    .intel-header h2 {
+        font-size: 1.5rem;
     }
 }

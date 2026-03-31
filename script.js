@@ -1,4 +1,57 @@
 let hotelLiveData = [];
+let currentCurrency = 'THB';
+
+const exchangeRates = {
+    'THB': 36.5,
+    'USD': 1.0,
+    'EUR': 0.92,
+    'GBP': 0.79,
+    'JPY': 151.4,
+    'SGD': 1.35,
+    'AUD': 1.53
+};
+
+const currencySymbols = {
+    'THB': '฿',
+    'USD': '$',
+    'EUR': '€',
+    'GBP': '£',
+    'JPY': '¥',
+    'SGD': 'S$',
+    'AUD': 'A$'
+};
+
+/**
+ * Handle currency change.
+ */
+function changeCurrency(currency) {
+    currentCurrency = currency;
+    updatePricesInUI();
+    
+    // If rate shopper is open, refresh it
+    const section = document.getElementById('rate-shopper-section');
+    if (section && section.style.display !== 'none') {
+        const hotelNameElement = document.getElementById('shopper-hotel-name');
+        const hotelName = hotelNameElement.innerText.replace('Rate Shopper - ', '');
+        const hotel = hotelLiveData.find(h => h.name === hotelName);
+        if (hotel) openRateShopper(hotel.id);
+    }
+}
+
+/**
+ * Format price based on current currency.
+ */
+function formatPrice(usdPrice) {
+    if (usdPrice === 'N/A' || isNaN(usdPrice)) return 'N/A';
+    
+    const converted = usdPrice * exchangeRates[currentCurrency];
+    const symbol = currencySymbols[currentCurrency];
+    
+    if (currentCurrency === 'THB' || currentCurrency === 'JPY') {
+        return `${symbol}${Math.round(converted).toLocaleString()}`;
+    }
+    return `${symbol}${(Math.round(converted * 100) / 100).toFixed(2)}`;
+}
 
 /**
  * Fetch "Live" pricing data from our API.
@@ -28,13 +81,21 @@ function updatePricesInUI() {
         const priceList = card.querySelector('.price-list');
         priceList.innerHTML = '';
         
-        for (const [site, price] of Object.entries(hotel.live_prices)) {
+        for (const [site, data] of Object.entries(hotel.live_prices)) {
+            // Ensure data is the object {rate, url}
+            const price = (data && typeof data === 'object') ? data.rate : data;
+            const url = (data && typeof data === 'object') ? data.url : '#';
+            
             const li = document.createElement('li');
             li.setAttribute('data-site', site);
+            li.style.cursor = 'pointer';
+            li.setAttribute('title', `Book on ${site}`);
+            li.onclick = () => window.open(url, '_blank');
+            
             li.innerHTML = `
                 <span class="site-name">${site}</span>
-                <span class="price-tag">$${price} <small class="live-pulse">LIVE</small></span>
-                <a href="#" class="view-btn">View Deal</a>
+                <span class="price-tag">${formatPrice(price)} <small class="live-pulse">LIVE</small></span>
+                <a href="${url}" target="_blank" class="view-btn" onclick="event.stopPropagation()">View Deal</a>
             `;
             priceList.appendChild(li);
         }
@@ -48,7 +109,7 @@ function updatePricesInUI() {
                 item.className = 'comp-mini-item';
                 item.innerHTML = `
                     <span class="comp-mini-name">${comp.name}</span>
-                    <span class="comp-mini-price">$${comp.current_price}</span>
+                    <span class="comp-mini-price">${formatPrice(comp.current_price)}</span>
                 `;
                 compList.appendChild(item);
             });
@@ -66,7 +127,6 @@ function updatePricesInUI() {
 
 /**
  * Toggle the price comparison dropdown for a specific hotel.
- * @param {number} hotelId - The ID of the hotel to toggle.
  */
 function toggleDropdown(hotelId) {
     const card = document.getElementById(`hotel-${hotelId}`);
@@ -80,76 +140,17 @@ function toggleDropdown(hotelId) {
     // Toggle current
     if (!isAlreadyActive) {
         card.classList.add('active');
+        // Smooth scroll on mobile
+        if (window.innerWidth < 768) {
+            setTimeout(() => {
+                card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 300);
+        }
     }
 }
-
-/**
- * Wrapper function for the competitor button click.
- * @param {HTMLElement} btn - The button that was clicked.
- */
-function handleCompetitorClick(btn) {
-    // Get the hotel ID from the parent card
-    const card = btn.closest('.hotel-card');
-    const hotelId = parseInt(card.id.split('-')[1]);
-    
-    // Find the hotel in our live data
-    const hotel = hotelLiveData.find(h => h.id === hotelId);
-    if (hotel) {
-        showCompetitors(hotel.competitors);
-    }
-}
-
-/**
- * Show competitor hotels in a modal.
- * @param {Array} competitors - List of competitor objects with live prices.
- */
-function showCompetitors(competitors) {
-    const modal = document.getElementById('comp-modal');
-    const compGrid = document.getElementById('competitor-list');
-    
-    // Clear list
-    compGrid.innerHTML = '';
-    
-    // Add competitors to grid
-    if (competitors && competitors.length > 0) {
-        competitors.forEach(comp => {
-            const item = document.createElement('div');
-            item.className = 'competitor-item';
-            item.innerHTML = `
-                <div class="comp-info">
-                    <i class="ph-buildings-fill"></i>
-                    <span>${comp.name}</span>
-                </div>
-                <div class="comp-price">
-                    $${comp.current_price}
-                </div>
-            `;
-            compGrid.appendChild(item);
-        });
-    } else {
-        compGrid.innerHTML = '<p class="text-muted">No competitors found for this hotel.</p>';
-    }
-    
-    // Show modal
-    modal.classList.add('show');
-}
-
-// Close modal when clicking X
-document.querySelector('.close-modal').addEventListener('click', () => {
-    document.getElementById('comp-modal').classList.remove('show');
-});
-
-// Close modal when clicking outside content
-window.addEventListener('click', (event) => {
-    const modal = document.getElementById('comp-modal');
-    if (event.target == modal) {
-        modal.classList.remove('show');
-    }
-});
 
 /**
  * Open the Rate Shopper comparison table for a specific hotel.
- * @param {number} hotelId - The ID of the hotel to analyze.
  */
 function openRateShopper(hotelId) {
     const hotel = hotelLiveData.find(h => h.id === hotelId);
@@ -179,10 +180,10 @@ function openRateShopper(hotelId) {
     mainHotelHeader.className = 'main-hotel-col';
     theadRow.appendChild(mainHotelHeader);
 
-    const displayCompetitors = hotel.competitors; // Show all available competitors
-    displayCompetitors.forEach((comp, index) => {
+    const displayCompetitors = hotel.competitors;
+    displayCompetitors.forEach(comp => {
         const th = document.createElement('th');
-        th.innerText = comp.name; // Show the actual competitor name
+        th.innerText = comp.name;
         th.className = 'comp-header';
         theadRow.appendChild(th);
     });
@@ -197,53 +198,54 @@ function openRateShopper(hotelId) {
         otaNameCell.innerText = ota;
         tr.appendChild(otaNameCell);
 
-        // Main Hotel Price for this OTA
+        // Main Hotel Price + URL logic
         const mainPriceCell = document.createElement('td');
         mainPriceCell.className = 'main-hotel-col';
-        let basePrice = hotel.live_prices[ota] || (200 + Math.floor(Math.random() * 100));
-        mainPriceCell.innerHTML = `<span class="price-val">$${basePrice}</span>`;
+        
+        const otaData = hotel.live_prices[ota];
+        const price = (otaData && typeof otaData === 'object') ? otaData.rate : otaData;
+        const url = (otaData && typeof otaData === 'object') ? otaData.url : '#';
+        
+        mainPriceCell.innerHTML = `
+            <span class="price-val" style="cursor:pointer; color:inherit; text-decoration:underline;" 
+                  onclick="window.open('${url}', '_blank')">
+                ${formatPrice(price)}
+            </span>
+        `;
         tr.appendChild(mainPriceCell);
 
-        // Competitor Prices for this OTA
+        // Competitors logic
         displayCompetitors.forEach(comp => {
             const compPriceCell = document.createElement('td');
-            // Simulate variability across OTAs for competitors
+            // Mock price if not exists
             let compBase = comp.current_price || (180 + Math.floor(Math.random() * 120));
-            let variance = (Math.random() * 10 - 5); // +/- $5 variance across OTAs
+            // Slight variance across OTAs
+            let variance = (Math.random() * 10 - 5);
             let finalPrice = Math.round(compBase + variance);
             
-            // Highlight if cheaper than main hotel
-            if (finalPrice < basePrice) {
+            if (finalPrice < price) {
                 compPriceCell.className = 'price-lower';
-            } else if (finalPrice > basePrice) {
+            } else if (finalPrice > price) {
                 compPriceCell.className = 'price-higher';
             }
 
-            compPriceCell.innerHTML = `<span class="price-val">$${finalPrice}</span>`;
+            compPriceCell.innerHTML = `<span class="price-val">${formatPrice(finalPrice)}</span>`;
             tr.appendChild(compPriceCell);
         });
 
         tbody.appendChild(tr);
     });
 
-    // Show section
     section.style.display = 'block';
     section.scrollIntoView({ behavior: 'smooth' });
 }
 
-/**
- * Close the Rate Shopper section.
- */
 function closeRateShopper() {
-    const section = document.getElementById('rate-shopper-section');
-    section.style.display = 'none';
+    document.getElementById('rate-shopper-section').style.display = 'none';
 }
 
-// Load live data on initialization
 document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('currency-select').value = currentCurrency;
     fetchLivePrices();
-    
-    // Refresh prices every 60 seconds for simulation effect
     setInterval(fetchLivePrices, 60000);
 });
-

@@ -23,6 +23,18 @@
                 <a href="#">Home</a>
                 <a href="#">Deals</a>
                 <a href="#">About</a>
+                <div class="currency-selector">
+                    <i class="ph-currency-circle-dollar"></i>
+                    <select id="currency-select" onchange="changeCurrency(this.value)">
+                        <option value="THB" selected>THB (฿)</option>
+                        <option value="USD">USD ($)</option>
+                        <option value="EUR">EUR (€)</option>
+                        <option value="GBP">GBP (£)</option>
+                        <option value="JPY">JPY (¥)</option>
+                        <option value="SGD">SGD (S$)</option>
+                        <option value="AUD">AUD (A$)</option>
+                    </select>
+                </div>
                 <button class="btn btn-primary">Sign In</button>
             </nav>
         </div>
@@ -160,6 +172,6 @@
         </div>
     </footer>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=1.1"></script>
 </body>
 </html>

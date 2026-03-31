@@ -17,7 +17,7 @@ function fetchHotelLiveRates($key) {
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1); 
     curl_setopt($ch, CURLOPT_TIMEOUT, 12);
     curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36');
     $result = curl_exec($ch);
@@ -55,24 +55,54 @@ foreach ($hotels as $hotel) {
         // Map actual rates if found
         if ($liveRates) {
             foreach ($liveRates as $rate) {
-                $prices[$rate['name']] = $rate['rate'];
+                $prices[$rate['name']] = [
+                    'rate' => $rate['rate'],
+                    'url' => $rate['url'] ?? null
+                ];
             }
         }
 
         // Fill in missing target sites with randomized realistic prices
-        $basePrice = isset($prices['Booking.com']) ? (int)$prices['Booking.com'] : rand(300, 600);
+        $basePrice = isset($prices['Booking.com']) ? (int)$prices['Booking.com']['rate'] : rand(300, 600);
         $finalPrices = [];
         foreach ($targetSites as $site) {
             if (isset($prices[$site])) {
                 $finalPrices[$site] = $prices[$site];
             } else {
                 // Mock it to look realistic (±5% of base)
-                $finalPrices[$site] = (int)($basePrice * (rand(95, 105) / 100));
+                $finalPrices[$site] = [
+                    'rate' => (int)($basePrice * (rand(95, 105) / 100)),
+                    'url' => null
+                ];
+            }
+            
+            // If no URL, generate a fallback search URL
+            if (empty($finalPrices[$site]['url'])) {
+                $searchName = urlencode($hotel['name']);
+                switch($site) {
+                    case 'Agoda': 
+                        $finalPrices[$site]['url'] = "https://www.agoda.com/search?asq=" . $searchName;
+                        break;
+                    case 'Booking.com': 
+                        $finalPrices[$site]['url'] = "https://www.booking.com/searchresults.html?ss=" . $searchName;
+                        break;
+                    case 'Expedia': 
+                        $finalPrices[$site]['url'] = "https://www.expedia.com/Hotel-Search?filtering=none&regionId=0&searchText=" . $searchName;
+                        break;
+                    case 'Tripadvisor': 
+                        $finalPrices[$site]['url'] = "https://www.tripadvisor.com/Search?q=" . $searchName;
+                        break;
+                    case 'Hotel Website':
+                        $finalPrices[$site]['url'] = "#"; // Assuming it's a direct book link
+                        break;
+                    default:
+                        $finalPrices[$site]['url'] = "https://www.google.com/search?q=" . $searchName . "+" . urlencode($site);
+                }
             }
         }
         
         // Ensure "Hotel Website" is competitive
-        $finalPrices['Hotel Website'] = (int)($basePrice * 0.92); // 8% cheaper
+        $finalPrices['Hotel Website']['rate'] = (int)($basePrice * 0.92); // 8% cheaper
 
         $hotelData = [
             "id" => $hotel['id'],
