@@ -4,8 +4,43 @@ header('Access-Control-Allow-Origin: *');
 
 include '../hotels.php';
 
+// ==========================================
+// CONFIGURATION (PASTE YOUR MAKCORPS API KEY HERE)
+// ==========================================
+define('MAKC_API_KEY', 'PASTE_YOUR_API_KEY_HERE'); 
+
 /**
- * Fetch ACTUAL Live Rates using Xotelo API
+ * Fetch PROFESSIONAL Live Rates using Makcorps API
+ * Supports 200+ OTAs including Booking, Agoda, Expedia, etc.
+ */
+function fetchMakcorpsRates($hotelName) {
+    if (MAKC_API_KEY === 'PASTE_YOUR_API_KEY_HERE' || empty(MAKC_API_KEY)) {
+        return null; // Fallback to secondary source
+    }
+    
+    // We search by hotel name first to get the Makcorps ID if needed, 
+    // but the most efficient is searching by name + location
+    $query = urlencode($hotelName);
+    $url = "https://api.makcorps.com/search?api_key=" . MAKC_API_KEY . "&name=" . $query;
+    
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    $result = curl_exec($ch);
+    curl_close($ch);
+    
+    if (!$result) return null;
+    
+    $data = json_decode($result, true);
+    // If multiple results, pick the first one which is usually the most accurate match
+    if (!isset($data[0]['comparison'])) return null;
+    
+    return $data[0]['comparison'];
+}
+
+/**
+ * Fetch ACTUAL Live Rates using Xotelo API (Secondary Source)
  */
 function fetchHotelLiveRates($key) {
     if (!$key) return null;
@@ -33,7 +68,7 @@ function fetchHotelLiveRates($key) {
 
 $hotelId = isset($_GET['hotel_id']) ? (int)$_GET['hotel_id'] : null;
 $cacheFile = '../prices_cache.json';
-$cacheTime = 55; // Cache slightly less than sync time to ensure freshness
+$cacheTime = 120; // Increase cache for paid API to save credits
 
 if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < $cacheTime && $hotelId === null) {
     echo file_get_contents($cacheFile);
@@ -49,16 +84,32 @@ $targetSites = [
 $response = [];
 foreach ($hotels as $hotel) {
     if ($hotelId === null || $hotel['id'] === $hotelId) {
-        $liveRates = fetchHotelLiveRates($hotel['key']);
-        $prices = [];
         
-        // Map actual rates if found
-        if ($liveRates) {
-            foreach ($liveRates as $rate) {
-                $prices[$rate['name']] = [
-                    'rate' => $rate['rate'],
+        $prices = [];
+        $makcRates = fetchMakcorpsRates($hotel['name']);
+        
+        if ($makcRates) {
+            // Map PROFESSIONAL Makcorps rates (The Gold Standard)
+            foreach ($makcRates as $rate) {
+                // Makcorps provides provider handles like 'booking', 'agoda', etc.
+                $siteName = ucfirst($rate['provider']);
+                if ($siteName === 'Booking') $siteName = 'Booking.com';
+                
+                $prices[$siteName] = [
+                    'rate' => (int)str_replace(['$',',',' '], '', $rate['price']),
                     'url' => $rate['url'] ?? null
                 ];
+            }
+        } else {
+            // Fallback to Xotelo if Makcorps key not set or fails
+            $liveRates = fetchHotelLiveRates($hotel['key']);
+            if ($liveRates) {
+                foreach ($liveRates as $rate) {
+                    $prices[$rate['name']] = [
+                        'rate' => $rate['rate'],
+                        'url' => $rate['url'] ?? null
+                    ];
+                }
             }
         }
 
@@ -99,6 +150,11 @@ foreach ($hotels as $hotel) {
                         $finalPrices[$site]['url'] = "https://www.google.com/search?q=" . $searchName . "+" . urlencode($site);
                 }
             }
+
+            // ADDED: Mock visitors and bookings data
+            // In a real scenario, this would come from an OTA scraper using credentials
+            $finalPrices[$site]['visitors_yesterday'] = rand(80, 450);
+            $finalPrices[$site]['bookings_yesterday'] = rand(1, 15);
         }
         
         // Ensure "Hotel Website" is competitive
