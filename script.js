@@ -8,7 +8,8 @@ const exchangeRates = {
     'GBP': 0.79,
     'JPY': 151.4,
     'SGD': 1.35,
-    'AUD': 1.53
+    'AUD': 1.53,
+    'INR': 83.2
 };
 
 const currencySymbols = {
@@ -18,7 +19,8 @@ const currencySymbols = {
     'GBP': '£',
     'JPY': '¥',
     'SGD': 'S$',
-    'AUD': 'A$'
+    'AUD': 'A$',
+    'INR': '₹'
 };
 
 /**
@@ -55,7 +57,7 @@ function formatPrice(usdPrice) {
     const converted = usdPrice * exchangeRates[currentCurrency];
     const symbol = currencySymbols[currentCurrency];
 
-    if (currentCurrency === 'THB' || currentCurrency === 'JPY') {
+    if (currentCurrency === 'THB' || currentCurrency === 'JPY' || currentCurrency === 'INR') {
         return `${symbol}${Math.round(converted).toLocaleString()}`;
     }
     return `${symbol}${(Math.round(converted * 100) / 100).toFixed(2)}`;

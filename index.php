@@ -33,6 +33,7 @@
                         <option value="JPY">JPY (¥)</option>
                         <option value="SGD">SGD (S$)</option>
                         <option value="AUD">AUD (A$)</option>
+                        <option value="INR">INR (₹)</option>
                     </select>
                 </div>
                 <button class="btn btn-primary">Sign In</button>
@@ -172,6 +173,6 @@
         </div>
     </footer>
 
-    <script src="script.js?v=1.1"></script>
+    <script src="script.js?v=1.2"></script>
 </body>
 </html>
