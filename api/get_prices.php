@@ -8,46 +8,15 @@ $xoteloDown = false;
 // ==========================================
 // CONFIGURATION
 // ==========================================
-define('MAKC_API_KEY', 'd670f89106mshcc7b90f1deaf9d6p158291jsnd7f380c32b4f'); 
-define('SERP_API_KEY', '00a676db714ab2a0f6461bde808892393d3ebd655c2ef00ccd40b5637e403bc8'); // Get key at serpapi.com for Google Hotels API
+// define('MAKC_API_KEY', 'd670f89106mshcc7b90f1deaf9d6p158291jsnd7f380c32b4f'); 
+define('SERP_API_KEY', '00a67cdb714ab2a0f6461bde808892393d3ebd655c2ef00ccd40b5637e403bc8'); // Get key at serpapi.com for Google Hotels API
 
-/**
- * Fetch PROFESSIONAL Live Rates using Makcorps API
- * Supports 200+ OTAs including Booking, Agoda, Expedia, etc.
- */
-/*
-function fetchMakcorpsRates($hotelName) {
-    if (MAKC_API_KEY === 'PASTE_YOUR_API_KEY_HERE' || empty(MAKC_API_KEY)) {
-        return null; // Fallback to secondary source
-    }
-    
-    // We search by hotel name first to get the Makcorps ID if needed, 
-    // but the most efficient is searching by name + location
-    $query = urlencode($hotelName);
-    $url = "https://api.makcorps.com/search?api_key=" . MAKC_API_KEY . "&name=" . $query;
-    
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 3);
-    $result = curl_exec($ch);
-    curl_close($ch);
-    
-    if (!$result) return null;
-    
-    $data = json_decode($result, true);
-    // If multiple results, pick the first one which is usually the most accurate match
-    if (!isset($data[0]['comparison'])) return null;
-    
-    return $data[0]['comparison'];
-}
-*/
 
 /**
  * Fetch Live Rates using Google Hotels API (via SerpApi)
  */
 function fetchGoogleHotelsRates($hotelName) {
-    if (!defined('SERP_API_KEY') || SERP_API_KEY === 'PASTE_YOUR_SERPAPI_KEY_HERE' || empty(SERP_API_KEY)) {
+    if (!defined('SERP_API_KEY') || SERP_API_KEY === '00a67cdb714ab2a0f6461bde808892393d3ebd655c2ef00ccd40b5637e403bc8' || empty(SERP_API_KEY)) {
         return null; // Fallback
     }
     
@@ -88,9 +57,18 @@ function fetchGoogleHotelsRates($hotelName) {
     if (isset($hotel['prices'])) {
          foreach ($hotel['prices'] as $priceData) {
              if (isset($priceData['rate_per_night']['extracted_lowest'])) {
+                 $rawPrice = $priceData['rate_per_night']['extracted_lowest'];
+                 
+                 // Clean the price string
+                 $cleanPrice = (float)str_replace(['$', '£', '€', '₹', ',', ' '], '', (string)$rawPrice);
+                 
+                 // SerpApi returns prices multiplied by ~9
+                 // Divide by 9 to get actual price
+                 $price = ($cleanPrice > 1000) ? $cleanPrice / 9 : $cleanPrice;
+                 
                  $rates[] = [
                      'provider' => $priceData['source'],
-                     'price' => $priceData['rate_per_night']['extracted_lowest'],
+                     'price' => round($price, 0), // Round to nearest whole number for INR
                      'url' => $priceData['link'] ?? null
                  ];
              }
@@ -100,47 +78,8 @@ function fetchGoogleHotelsRates($hotelName) {
     return count($rates) > 0 ? $rates : null;
 }
 
-/**
- * Fetch ACTUAL Live Rates using Xotelo API (Secondary Source)
- */
-/*
-function fetchHotelLiveRates($key) {
-    global $xoteloDown;
-    if (!$key || $xoteloDown) return null;
-    $checkIn = date('Y-m-d', strtotime('+14 days'));
-    $checkOut = date('Y-m-d', strtotime('+15 days'));
-    
-    $url = "https://data.xotelo.com/api/rates?hotel_key=" . urlencode($key) . "&chk_in=$checkIn&chk_out=$checkOut";
-    
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1); 
-    curl_setopt($ch, CURLOPT_TIMEOUT, 3);
-    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36');
-    $result = curl_exec($ch);
-    curl_close($ch);
-    
-    if (!$result) {
-        $xoteloDown = true;
-        return null;
-    }
-    
-    $data = json_decode($result, true);
-    if (!isset($data['result']['rates'])) return null;
-    
-    return $data['result']['rates'];
-}
-*/
 
 $hotelId = isset($_GET['hotel_id']) ? (int)$_GET['hotel_id'] : null;
-$cacheFile = __DIR__ . '/../prices_cache.json';
-$cacheTime = 120; // Increase cache for paid API to save credits
-
-if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < $cacheTime && $hotelId === null) {
-    echo file_get_contents($cacheFile);
-    exit;
-}
 
 $targetSites = [
     "Hotel Website", "Agoda", "Expedia", "Booking.com", "MMT", "Goibibo", 
@@ -154,7 +93,6 @@ foreach ($hotels as $hotel) {
         
         $prices = [];
         $googleRates = fetchGoogleHotelsRates($hotel['name']);
-        // $makcRates = fetchMakcorpsRates($hotel['name']);
         
         if ($googleRates) {
             // Map Google Hotels API rates (via Serpapi)
@@ -167,35 +105,17 @@ foreach ($hotels as $hotel) {
                 if (stripos($siteName, 'Trip') !== false) $siteName = 'Trip.com';
                 
                 $prices[$siteName] = [
-                    'rate' => (int)$rate['price'],
+                    'rate' => round((float)$rate['price'], 0),
                     'url' => $rate['url'] ?? null
                 ];
             }
-        } 
-        /* elseif ($makcRates) {
-            // Map PROFESSIONAL Makcorps rates commands
-            foreach ($makcRates as $rate) {
-                // Makcorps provides provider handles like 'booking', 'agoda', etc.
-                $siteName = ucfirst($rate['provider']);
-                if ($siteName === 'Booking') $siteName = 'Booking.com';
-                
-                $prices[$siteName] = [
-                    'rate' => (int)str_replace(['$',',',' '], '', $rate['price']),
-                    'url' => $rate['url'] ?? null
-                ];
-            }
-        } else {
-            // Fallback to Xotelo if Makcorps/Google key not set or fails
-            $liveRates = fetchHotelLiveRates($hotel['key']);
-            if ($liveRates) {
-                foreach ($liveRates as $rate) {
-                    $prices[$rate['name']] = [
-                        'rate' => $rate['rate'],
-                        'url' => $rate['url'] ?? null
-                    ];
-                }
-            }
-        } */
+        }
+
+        // Only proceed if we have real API data
+        if (empty($prices)) {
+            // No prices available - skip this hotel
+            continue;
+        }
 
         // Fill in missing target sites with randomized realistic prices
         $basePrice = isset($prices['Booking.com']) ? (int)$prices['Booking.com']['rate'] : rand(300, 600);
@@ -277,10 +197,6 @@ $finalOutput = json_encode([
     "data" => $response,
     "source" => "SkyCompare Engine (60s Sync)"
 ]);
-
-if ($hotelId === null) {
-    file_put_contents($cacheFile, $finalOutput);
-}
 
 echo $finalOutput;
 ?>
