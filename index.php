@@ -46,12 +46,34 @@
             <div class="container hero-content">
                 <h1>Find the Best Hotel Deals Instantly</h1>
                 <p>Compare prices across top travel websites and discover the best value for your next stay.</p>
+                
+                <!-- Search Form -->
+                <div class="search-box">
+                    <div class="search-input-group">
+                        <i class="ph-magnifying-glass"></i>
+                        <input type="text" id="hotel-search" placeholder="Search for a hotel..." />
+                        <button id="search-btn" class="btn btn-primary">Search</button>
+                    </div>
+                    <div id="search-loading" style="display:none; text-align: center; margin-top: 10px;">
+                        <p>Searching hotels...</p>
+                    </div>
+                    <div id="search-error" style="display:none; color: #e74c3c; margin-top: 10px; text-align: center;"></div>
+                </div>
             </div>
         </section>
 
         <section class="hotel-list-section">
             <div class="container">
-                <div class="hotel-grid">
+                <div id="search-results-container" style="display:none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <h2>Search Results</h2>
+                        <button id="clear-search-btn" class="btn btn-secondary" style="font-size: 0.9rem; padding: 0.5rem 1rem;">Back to All Hotels</button>
+                    </div>
+                    <div id="search-results" class="hotel-grid"></div>
+                </div>
+                
+                <div id="default-hotels-container">
+                    <div class="hotel-grid">
                     <?php foreach ($hotels as $hotel): ?>
                         <div class="hotel-card" id="hotel-<?php echo $hotel['id']; ?>">
                             <div class="hotel-image" style="background-image: url('<?php echo $hotel['image']; ?>');">
@@ -96,7 +118,10 @@
                         </div>
                     <?php endforeach; ?>
                 </div>
+                </div>
             </div>
+        </section>
+
         <section class="rate-shopper-section" id="rate-shopper-section" style="display: none;">
             <div class="container">
                 <div class="rate-shopper-card">

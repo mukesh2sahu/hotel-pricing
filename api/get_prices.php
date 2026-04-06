@@ -8,15 +8,15 @@ $xoteloDown = false;
 // ==========================================
 // CONFIGURATION
 // ==========================================
-// define('MAKC_API_KEY', 'd670f89106mshcc7b90f1deaf9d6p158291jsnd7f380c32b4f'); 
-define('SERP_API_KEY', '00a67cdb714ab2a0f6461bde808892393d3ebd655c2ef00ccd40b5637e403bc8'); // Get key at serpapi.com for Google Hotels API
+
+define('SERP_API_KEY', 'a67d0d35664e07f1bc469e5d69bdf20c95287fc99eda0c02b5da1e92589b0185'); // Get key at serpapi.com for Google Hotels API
 
 
 /**
  * Fetch Live Rates using Google Hotels API (via SerpApi)
  */
 function fetchGoogleHotelsRates($hotelName) {
-    if (!defined('SERP_API_KEY') || SERP_API_KEY === '00a67cdb714ab2a0f6461bde808892393d3ebd655c2ef00ccd40b5637e403bc8' || empty(SERP_API_KEY)) {
+    if (!defined('SERP_API_KEY') || empty(SERP_API_KEY)) {
         return null; // Fallback
     }
     
@@ -42,37 +42,55 @@ function fetchGoogleHotelsRates($hotelName) {
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
     curl_setopt($ch, CURLOPT_TIMEOUT, 6);
     $result = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
     curl_close($ch);
     
-    if (!$result) return null;
-    $data = json_decode($result, true);
-    
-    if (!isset($data['properties']) || count($data['properties']) === 0) {
+    if (!$result) {
+        error_log("SerpApi Error for '$hotelName': cURL failed - $curlError (HTTP $httpCode)");
         return null;
     }
     
-    $hotel = $data['properties'][0]; // Pick the most relevant property
+    $data = json_decode($result, true);
+    
+    // Check for API errors
+    if (isset($data['error'])) {
+        error_log("SerpApi Error for '$hotelName': " . $data['error']);
+        return null;
+    }
+    
     $rates = [];
     
-    if (isset($hotel['prices'])) {
-         foreach ($hotel['prices'] as $priceData) {
-             if (isset($priceData['rate_per_night']['extracted_lowest'])) {
-                 $rawPrice = $priceData['rate_per_night']['extracted_lowest'];
-                 
-                 // Clean the price string
-                 $cleanPrice = (float)str_replace(['$', '£', '€', '₹', ',', ' '], '', (string)$rawPrice);
-                 
-                 // SerpApi returns prices multiplied by ~9
-                 // Divide by 9 to get actual price
-                 $price = ($cleanPrice > 1000) ? $cleanPrice / 9 : $cleanPrice;
-                 
-                 $rates[] = [
-                     'provider' => $priceData['source'],
-                     'price' => round($price, 0), // Round to nearest whole number for INR
-                     'url' => $priceData['link'] ?? null
-                 ];
-             }
-         }
+    // First, try to get prices from the ads section (most reliable with provider names)
+    if (isset($data['ads']) && is_array($data['ads'])) {
+        foreach ($data['ads'] as $ad) {
+            if (isset($ad['price']) && isset($ad['source'])) {
+                // Extract numeric price from string like "$89"
+                $priceStr = str_replace('$', '', (string)$ad['price']);
+                $price = (float)$priceStr;
+                
+                $rates[] = [
+                    'provider' => $ad['source'],
+                    'price' => round($price, 0),
+                    'url' => $ad['link'] ?? null
+                ];
+            }
+        }
+    }
+    
+    // If no ads found, try properties section
+    if (empty($rates) && isset($data['properties']) && is_array($data['properties'])) {
+        foreach (array_slice($data['properties'], 0, 3) as $property) {
+            if (isset($property['rate_per_night']['extracted_lowest'])) {
+                $price = (float)$property['rate_per_night']['extracted_lowest'];
+                
+                $rates[] = [
+                    'provider' => 'Google Hotels',
+                    'price' => round($price, 0),
+                    'url' => $property['link'] ?? null
+                ];
+            }
+        }
     }
     
     return count($rates) > 0 ? $rates : null;
@@ -113,57 +131,46 @@ foreach ($hotels as $hotel) {
 
         // Only proceed if we have real API data
         if (empty($prices)) {
-            // No prices available - skip this hotel
+            // Skip hotels without real API data
             continue;
         }
 
-        // Fill in missing target sites with randomized realistic prices
-        $basePrice = isset($prices['Booking.com']) ? (int)$prices['Booking.com']['rate'] : rand(300, 600);
+        // Use only real API prices - no fallback/mock data
         $finalPrices = [];
         foreach ($targetSites as $site) {
             if (isset($prices[$site])) {
                 $finalPrices[$site] = $prices[$site];
-            } else {
-                // Mock it to look realistic (±5% of base)
-                $finalPrices[$site] = [
-                    'rate' => (int)($basePrice * (rand(95, 105) / 100)),
-                    'url' => null
-                ];
             }
-            
-            // If no URL, generate a fallback search URL
-            if (empty($finalPrices[$site]['url'])) {
+        }
+        
+        // Only add URLs for the prices we actually have from API
+        foreach ($finalPrices as $site => &$priceData) {
+            if (empty($priceData['url'])) {
                 $searchName = urlencode($hotel['name']);
                 switch($site) {
                     case 'Agoda': 
-                        $finalPrices[$site]['url'] = "https://www.agoda.com/search?asq=" . $searchName;
+                        $priceData['url'] = "https://www.agoda.com/search?asq=" . $searchName;
                         break;
                     case 'Booking.com': 
-                        $finalPrices[$site]['url'] = "https://www.booking.com/searchresults.html?ss=" . $searchName;
+                        $priceData['url'] = "https://www.booking.com/searchresults.html?ss=" . $searchName;
                         break;
                     case 'Expedia': 
-                        $finalPrices[$site]['url'] = "https://www.expedia.com/Hotel-Search?filtering=none&regionId=0&searchText=" . $searchName;
+                        $priceData['url'] = "https://www.expedia.com/Hotel-Search?filtering=none&regionId=0&searchText=" . $searchName;
                         break;
                     case 'Tripadvisor': 
-                        $finalPrices[$site]['url'] = "https://www.tripadvisor.com/Search?q=" . $searchName;
+                        $priceData['url'] = "https://www.tripadvisor.com/Search?q=" . $searchName;
                         break;
                     case 'Hotel Website':
-                        $finalPrices[$site]['url'] = "#"; // Assuming it's a direct book link
+                        $priceData['url'] = "#";
                         break;
                     default:
-                        $finalPrices[$site]['url'] = "https://www.google.com/search?q=" . $searchName . "+" . urlencode($site);
+                        $priceData['url'] = "https://www.google.com/search?q=" . $searchName . "+" . urlencode($site);
                 }
             }
-
-            // ADDED: Mock visitors and bookings data
-            // In a real scenario, this would come from an OTA scraper using credentials
-            $finalPrices[$site]['visitors_yesterday'] = rand(80, 450);
-            $finalPrices[$site]['bookings_yesterday'] = rand(1, 15);
         }
+        unset($priceData);
         
-        // Ensure "Hotel Website" is competitive
-        $finalPrices['Hotel Website']['rate'] = (int)($basePrice * 0.92); // 8% cheaper
-
+        // Build response with real API data only
         $hotelData = [
             "id" => $hotel['id'],
             "name" => $hotel['name'],
@@ -171,21 +178,6 @@ foreach ($hotels as $hotel) {
             "live_prices" => $finalPrices,
             "competitors" => []
         ];
-
-        // Fetch prices for Competitors
-        foreach ($hotel['competitors'] as $comp) {
-            // $compRates = fetchHotelLiveRates($comp['key'] ?? null);
-            $compRates = null;
-            $currentPrice = (int)($basePrice * (rand(90, 110) / 100));
-            if ($compRates && count($compRates) > 0) {
-                $currentPrice = $compRates[0]['rate'];
-            }
-            
-            $hotelData['competitors'][] = [
-                "name" => $comp['name'],
-                "current_price" => $currentPrice
-            ];
-        }
 
         $response[] = $hotelData;
     }
@@ -195,7 +187,7 @@ $finalOutput = json_encode([
     "status" => "success",
     "timestamp" => date('Y-m-d H:i:s'),
     "data" => $response,
-    "source" => "SkyCompare Engine (60s Sync)"
+    "source" => "SkyCompare Engine (Real API Data)"
 ]);
 
 echo $finalOutput;

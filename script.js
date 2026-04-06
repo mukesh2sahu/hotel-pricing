@@ -296,8 +296,172 @@ function closeRateShopper() {
     document.getElementById('rate-shopper-section').style.display = 'none';
 }
 
+/**
+ * Search for hotels from SerpApi
+ */
+async function searchHotels(hotelName) {
+    if (!hotelName || hotelName.trim().length < 2) {
+        showSearchError('Hotel name must be at least 2 characters');
+        return;
+    }
+
+    showSearchLoading(true);
+    hideSearchError();
+
+    try {
+        const response = await fetch(`api/search_hotels.php?q=${encodeURIComponent(hotelName)}`);
+        const result = await response.json();
+        
+        showSearchLoading(false);
+
+        if (result.status === 'success' && result.data && result.data.length > 0) {
+            displaySearchResults(result.data);
+        } else {
+            showSearchError(`No hotels found for "${hotelName}"`);
+        }
+    } catch (error) {
+        showSearchLoading(false);
+        showSearchError('Error searching hotels. Please try again.');
+        console.error('Search error:', error);
+    }
+}
+
+/**
+ * Display search results on the page
+ */
+function displaySearchResults(hotels) {
+    const container = document.getElementById('search-results');
+    const resultsSection = document.getElementById('search-results-container');
+    const defaultHotels = document.getElementById('default-hotels-container');
+    
+    if (!container || !resultsSection) {
+        console.error('Search result containers not found');
+        return;
+    }
+    
+    container.innerHTML = '';
+    
+    // Hide default hotels and show results
+    if (defaultHotels) defaultHotels.style.display = 'none';
+    resultsSection.style.display = 'block';
+    resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    hotels.forEach((hotel) => {
+        const card = document.createElement('div');
+        card.className = 'search-result-card';
+        
+        const thumbnailUrl = hotel.thumbnail || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200"%3E%3Crect fill="%23ddd" width="400" height="200"/%3E%3Ctext x="50%25" y="50%25" font-size="18" text-anchor="middle" dy=".3em" fill="%23999"%3ENo Image%3C/text%3E%3C/svg%3E';
+        
+        let amenitiesHtml = '';
+        if (hotel.amenities && Array.isArray(hotel.amenities) && hotel.amenities.length > 0) {
+            const amenities = hotel.amenities.slice(0, 3);
+            amenitiesHtml = amenities.map(a => {
+                const escaped = (a || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                return `<span class="amenity-tag">${escaped}</span>`;
+            }).join('');
+        }
+        
+        const ratingHtml = hotel.rating ? `<small style="color: var(--text-muted);">★ ${hotel.rating} (${hotel.reviews || 0} ${hotel.reviews === 1 ? 'review' : 'reviews'})</small>` : '';
+        
+        const hotelName = (hotel.name || 'Hotel').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const source = (hotel.source || 'Unknown').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const price = formatPrice(parseFloat(hotel.price) || 0);
+        const link = (hotel.link || '#');
+        const linkAttr = link.startsWith('http') ? link : '#';
+        
+        card.innerHTML = `
+            <div class="result-thumbnail" style="background-image: url('${thumbnailUrl}');"></div>
+            <div class="result-info">
+                <div class="result-name">${hotelName}</div>
+                <div class="result-source">📌 Via ${source}</div>
+                ${ratingHtml}
+                <div class="result-price">${price}</div>
+                <div class="result-amenities">${amenitiesHtml}</div>
+                <a href="${linkAttr}" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="margin-top: 1rem; text-align: center; display: inline-block; width: 100%;">
+                    View Details
+                </a>
+            </div>
+        `;
+        
+        container.appendChild(card);
+    });
+}
+
+/**
+ * Show/hide search loading state
+ */
+function showSearchLoading(show) {
+    const loadingDiv = document.getElementById('search-loading');
+    if (loadingDiv) {
+        loadingDiv.style.display = show ? 'block' : 'none';
+    }
+}
+
+/**
+ * Show search error message
+ */
+function showSearchError(message) {
+    const errorDiv = document.getElementById('search-error');
+    if (errorDiv) {
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+/**
+ * Hide search error message
+ */
+function hideSearchError() {
+    const errorDiv = document.getElementById('search-error');
+    if (errorDiv) {
+        errorDiv.style.display = 'none';
+    }
+}
+
+/**
+ * Clear search results and show default hotels
+ */
+function clearSearch() {
+    const resultsSection = document.getElementById('search-results-container');
+    const defaultHotels = document.getElementById('default-hotels-container');
+    const hotelSearch = document.getElementById('hotel-search');
+    
+    if (hotelSearch) hotelSearch.value = '';
+    if (resultsSection) resultsSection.style.display = 'none';
+    if (defaultHotels) defaultHotels.style.display = 'block';
+    hideSearchError();
+    showSearchLoading(false);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('currency-select').value = currentCurrency;
     fetchLivePrices();
     setInterval(fetchLivePrices, 60000);
+    
+    // Setup search event listeners
+    const searchBtn = document.getElementById('search-btn');
+    const hotelSearch = document.getElementById('hotel-search');
+    const clearSearchBtn = document.getElementById('clear-search-btn');
+    
+    if (searchBtn && hotelSearch) {
+        searchBtn.addEventListener('click', () => {
+            if(hotelSearch.value.trim()) {
+                searchHotels(hotelSearch.value.trim());
+            }
+        });
+    }
+    
+    if (hotelSearch) {
+        hotelSearch.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                if(hotelSearch.value.trim()) {
+                    searchHotels(hotelSearch.value.trim());
+                }
+            }
+        });
+    }
+    
+    if (clearSearchBtn) {
+        clearSearchBtn.addEventListener('click', clearSearch);
+    }
 });
