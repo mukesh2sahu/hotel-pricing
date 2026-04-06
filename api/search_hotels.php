@@ -47,40 +47,50 @@ function searchHotels($hotelName, $checkInDaysFromNow = 14) {
     }
     
     $hotels = [];
+    $hotelNames = []; // Track unique hotel names to avoid duplicates
     
     // Extract hotels from ads section (these have OTA prices and provider names)
     if (isset($data['ads']) && is_array($data['ads'])) {
         foreach ($data['ads'] as $ad) {
-            $hotel = [
-                'name' => $ad['name'] ?? 'N/A',
-                'price' => str_replace('$', '', $ad['price'] ?? 'N/A'),
-                'source' => $ad['source'] ?? 'Unknown',
-                'link' => $ad['link'] ?? null,
-                'thumbnail' => $ad['thumbnail'] ?? null,
-                'rating' => $ad['overall_rating'] ?? null,
-                'reviews' => $ad['reviews'] ?? null,
-                'hotel_class' => $ad['hotel_class'] ?? null,
-                'amenities' => $ad['amenities'] ?? []
-            ];
-            $hotels[] = $hotel;
+            $name = $ad['name'] ?? 'N/A';
+            if (!isset($hotelNames[$name])) {
+                $hotel = [
+                    'name' => $name,
+                    'price' => str_replace('$', '', $ad['price'] ?? 'N/A'),
+                    'source' => $ad['source'] ?? 'Unknown',
+                    'link' => $ad['link'] ?? null,
+                    'thumbnail' => $ad['thumbnail'] ?? null,
+                    'rating' => $ad['overall_rating'] ?? null,
+                    'reviews' => $ad['reviews'] ?? null,
+                    'hotel_class' => $ad['hotel_class'] ?? null,
+                    'amenities' => $ad['amenities'] ?? []
+                ];
+                $hotels[] = $hotel;
+                $hotelNames[$name] = true;
+            }
         }
     }
     
-    // If no ads, try properties section
-    if (empty($hotels) && isset($data['properties']) && is_array($data['properties'])) {
-        foreach (array_slice($data['properties'], 0, 10) as $property) {
-            $hotel = [
-                'name' => $property['name'] ?? 'N/A',
-                'price' => $property['rate_per_night']['extracted_lowest'] ?? 'N/A',
-                'source' => 'Google Hotels',
-                'link' => $property['link'] ?? null,
-                'thumbnail' => isset($property['images'][0]) ? $property['images'][0]['thumbnail'] : null,
-                'rating' => $property['overall_rating'] ?? null,
-                'reviews' => $property['reviews'] ?? null,
-                'hotel_class' => $property['hotel_class'] ?? null,
-                'amenities' => $property['amenities'] ?? []
-            ];
-            $hotels[] = $hotel;
+    // Also get hotels from properties section (for comprehensive results)
+    if (isset($data['properties']) && is_array($data['properties'])) {
+        foreach ($data['properties'] as $property) {
+            $name = $property['name'] ?? 'N/A';
+            // Only add if not already in list (avoid duplicates)
+            if (!isset($hotelNames[$name])) {
+                $hotel = [
+                    'name' => $name,
+                    'price' => $property['rate_per_night']['extracted_lowest'] ?? 'N/A',
+                    'source' => 'Google Hotels',
+                    'link' => $property['link'] ?? null,
+                    'thumbnail' => isset($property['images'][0]) ? $property['images'][0]['thumbnail'] : null,
+                    'rating' => $property['overall_rating'] ?? null,
+                    'reviews' => $property['reviews'] ?? null,
+                    'hotel_class' => $property['hotel_class'] ?? null,
+                    'amenities' => $property['amenities'] ?? []
+                ];
+                $hotels[] = $hotel;
+                $hotelNames[$name] = true;
+            }
         }
     }
     
@@ -100,11 +110,71 @@ if (!$hotelName || strlen($hotelName) < 2) {
 
 $results = searchHotels($hotelName);
 
+// If no results, try multiple fallback strategies
+if (($results === null || empty($results)) && strlen($hotelName) > 2) {
+    
+    // Strategy 1: Remove common brand identifiers
+    if (strlen($hotelName) > 10) {
+        $simplified = $hotelName;
+        $simplified = preg_replace('/,\s*an\s+[A-Z]+\s+[A-Za-z]+/i', '', $simplified);
+        $simplified = preg_replace('/\s+by\s+[A-Za-z]+/i', '', $simplified);
+        $simplified = preg_replace('/\s+\([^)]*\)/i', '', $simplified);
+        $simplified = preg_replace('/\s+&\s+[A-Za-z]+/i', '', $simplified);
+        $simplified = preg_replace('/\s+(hotels|resorts|inns|motels|lodges)$/i', '', $simplified);
+        $simplified = trim($simplified);
+        
+        if ($simplified !== $hotelName && strlen($simplified) > 2) {
+            $results = searchHotels($simplified);
+        }
+    }
+    
+    // Strategy 2: If it looks like a brand/chain name, try with "hotels in" popular locations
+    if (($results === null || empty($results))) {
+        // Extract potential chain name (remove words like "hotels", "resorts", "&")
+        $chainName = preg_replace('/\s+(and|&)\s+.*/i', '', $hotelName);
+        $chainName = preg_replace('/\s+(hotels|resorts|inns)$/i', '', $chainName);
+        $chainName = trim($chainName);
+        
+        // List of major hotel destinations to try
+        $majorLocations = ['New Delhi', 'Mumbai', 'Bangkok', 'Singapore', 'Dubai', 'London', 'Paris', 'New York', 'Tokyo'];
+        
+        foreach ($majorLocations as $location) {
+            $searchQuery = $chainName . " " . $location;
+            $results = searchHotels($searchQuery);
+            if ($results !== null && !empty($results)) {
+                break;
+            }
+        }
+    }
+    
+    // Strategy 3: If still no results, search for category/type + popular location
+    if (($results === null || empty($results))) {
+        // Try "hotels in [popular locations]"
+        $fallbackSearches = [
+            'hotels in India',
+            'hotels in Asia',
+            'hotels worldwide',
+            'resorts worldwide',
+            'luxury accommodations'
+        ];
+        
+        foreach ($fallbackSearches as $search) {
+            $results = searchHotels($search);
+            if ($results !== null && !empty($results)) {
+                break;
+            }
+        }
+    }
+}
+
 if ($results === null || empty($results)) {
+    // If still no results, suggest what user can try
+    $suggestion = "Try searching with a specific location (e.g., 'Oberoi Delhi') or search for 'hotels in [city]'.";
+    
     echo json_encode([
         "status" => "success",
         "data" => [],
-        "message" => "No hotels found for: " . htmlspecialchars($hotelName)
+        "message" => "No hotels found for: " . htmlspecialchars($hotelName) . ". " . $suggestion
     ]);
 } else {
     echo json_encode([

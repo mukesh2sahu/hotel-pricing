@@ -941,6 +941,11 @@ footer {
         grid-template-columns: 1fr;
         gap: 1.5rem;
     }
+
+    #search-results {
+        grid-template-columns: 1fr;
+        gap: 1.2rem;
+    }
     
     .hotel-image {
         height: 180px;
@@ -1017,11 +1022,19 @@ footer {
 
 #search-results-container {
     margin-top: 2rem;
+    width: 100%;
 }
 
 #search-results-container h2 {
     margin-bottom: 1.5rem;
     color: var(--primary);
+}
+
+#search-results {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+    width: 100%;
 }
 
 /* Search Result Card Styles */
@@ -1034,6 +1047,7 @@ footer {
     display: flex;
     flex-direction: column;
     cursor: pointer;
+    height: 100%;
 }
 
 .search-result-card:hover {
@@ -1043,55 +1057,61 @@ footer {
 
 .result-thumbnail {
     width: 100%;
-    height: 200px;
+    height: 180px;
     background-size: cover;
     background-position: center;
     background-color: #e2e8f0;
 }
 
 .result-info {
-    padding: 1.5rem;
+    padding: 1.2rem;
     flex: 1;
     display: flex;
     flex-direction: column;
 }
 
 .result-name {
-    font-size: 1.2rem;
+    font-size: 1.1rem;
     font-weight: 700;
     color: var(--text-main);
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.4rem;
     line-height: 1.3;
 }
 
 .result-source {
     color: var(--primary);
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     margin-bottom: 0.5rem;
 }
 
 .result-price {
-    font-size: 1.8rem;
+    font-size: 1.5rem;
     font-weight: 700;
     color: var(--primary);
-    margin: 1rem 0;
+    margin: 0.8rem 0;
 }
 
 .result-amenities {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: 0.4rem;
     margin-top: auto;
+    margin-bottom: 0.8rem;
 }
 
 .amenity-tag {
     background-color: rgba(79, 70, 229, 0.1);
     color: var(--primary);
-    padding: 0.3rem 0.8rem;
-    border-radius: 0.5rem;
-    font-size: 0.8rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 0.4rem;
+    font-size: 0.75rem;
     font-weight: 500;
+}
+
+.search-result-card .btn {
+    padding: 0.7rem 1rem;
+    font-size: 0.9rem;
 }
 
 @media (max-width: 768px) {
