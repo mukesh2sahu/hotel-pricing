@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .search-result-main-card {
+            background: linear-gradient(135deg, white 0%, rgba(79, 70, 229, 0.05) 100%);
+            border: 2px solid #4f46e5;
+            border-radius: 8px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 15px rgba(79, 70, 229, 0.15);
+        }
+        .competitors-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            margin-top: 2rem;
+        }
+        .competitors-table thead {
+            background: linear-gradient(135deg, #4f46e5, #6366f1);
+            color: white;
+        }
+        .competitors-table th {
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+        }
+        .competitors-table td {
+            padding: 1rem;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+        .competitors-table tbody tr:hover {
+            background-color: rgba(79, 70, 229, 0.05);
+        }
+        .btn { background: #4f46e5; color: white; padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; }
+        h2 { color: #1f2937; margin: 0 0 0.5rem 0; }
+        .rating-display { font-size: 1rem; font-weight: 600; color: #1f2937; margin: 0.5rem 0 1rem 0; }
+        .result-price { font-size: 2.2rem; color: #4f46e5; margin: 1rem 0; font-weight: 700; }
+    </style>
+</head>
+<body>
+    <h1>✅ Search Results Format Test</h1>
+    
+    <div class="search-result-main-card">
+        <h2>Holiday Inn Kolkata Airport, an IHG Hotel</h2>
+        <div class="rating-display">⭐ 4.6 • 32,228 reviews</div>
+        <div class="result-price">$56 <span style="font-size: 1rem; color: #6b7280;">per night</span></div>
+        <button class="btn">Book Now</button>
+    </div>
+
+    <h3>Top Competitors (10 hotels)</h3>
+    <table class="competitors-table">
+        <thead>
+            <tr>
+                <th style="width: 35%;">Hotel Name</th>
+                <th style="width: 20%;">Price</th>
+                <th style="width: 15%;">Rating</th>
+                <th style="width: 15%;">Reviews</th>
+                <th style="width: 15%;">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Holiday Inn Express Kolkata Airport by IHG</strong></td>
+                <td style="font-size: 1.1rem; font-weight: 600; color: #4f46e5;">$57</td>
+                <td>4.5 ⭐</td>
+                <td>28,500</td>
+                <td><button class="btn">View</button></td>
+            </tr>
+            <tr>
+                <td><strong>Howard Johnson by Wyndham Kolkata</strong></td>
+                <td style="font-size: 1.1rem; font-weight: 600; color: #4f46e5;">$39</td>
+                <td>4.2 ⭐</td>
+                <td>15,200</td>
+                <td><button class="btn">View</button></td>
+            </tr>
+            <tr>
+                <td><strong>Regenta Inn Larica - Among Best Hotels in Kolkata</strong></td>
+                <td style="font-size: 1.1rem; font-weight: 600; color: #4f46e5;">$32</td>
+                <td>4.3 ⭐</td>
+                <td>12,800</td>
+                <td><button class="btn">View</button></td>
+            </tr>
+            <tr>
+                <td><strong>JW Marriott Calcutta</strong></td>
+                <td style="font-size: 1.1rem; font-weight: 600; color: #4f46e5;">$89</td>
+                <td>4.7 ⭐</td>
+                <td>35,600</td>
+                <td><button class="btn">View</button></td>
+            </tr>
+            <tr>
+                <td><strong>The Oberoi Grand - Kolkata</strong></td>
+                <td style="font-size: 1.1rem; font-weight: 600; color: #4f46e5;">$95</td>
+                <td>4.6 ⭐</td>
+                <td>28,900</td>
+                <td><button class="btn">View</button></td>
+            </tr>
+            <tr>
+                <td><strong>Taj Bengal Kolkata</strong></td>
+                <td style="font-size: 1.1rem; font-weight: 600; color: #4f46e5;">$105</td>
+                <td>4.8 ⭐</td>
+                <td>42,100</td>
+                <td><button class="btn">View</button></td>
+            </tr>
+            <tr>
+                <td><strong>ITC Sonar Kolkata</strong></td>
+                <td style="font-size: 1.1rem; font-weight: 600; color: #4f46e5;">$110</td>
+                <td>4.7 ⭐</td>
+                <td>38,500</td>
+                <td><button class="btn">View</button></td>
+            </tr>
+            <tr>
+                <td><strong>Novotel Kolkata Hotel & Residences</strong></td>
+                <td style="font-size: 1.1rem; font-weight: 600; color: #4f46e5;">$75</td>
+                <td>4.5 ⭐</td>
+                <td>22,300</td>
+                <td><button class="btn">View</button></td>
+            </tr>
+            <tr>
+                <td><strong>Crowne Plaza Kolkata</strong></td>
+                <td style="font-size: 1.1rem; font-weight: 600; color: #4f46e5;">$68</td>
+                <td>4.4 ⭐</td>
+                <td>18,900</td>
+                <td><button class="btn">View</button></td>
+            </tr>
+            <tr>
+                <td><strong>Radisson Blu Kolkata</strong></td>
+                <td style="font-size: 1.1rem; font-weight: 600; color: #4f46e5;">$82</td>
+                <td>4.6 ⭐</td>
+                <td>31,200</td>
+                <td><button class="btn">View</button></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <p style="margin-top: 3rem; color: #6b7280; text-align: center;">✅ Layout shows searched hotel prominently + Top 10 competitors in table format</p>
+</body>
+</html>

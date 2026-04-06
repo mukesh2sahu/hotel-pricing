@@ -1031,9 +1031,7 @@ footer {
 }
 
 #search-results {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 1.5rem;
+    display: block;
     width: 100%;
 }
 
@@ -1112,6 +1110,131 @@ footer {
 .search-result-card .btn {
     padding: 0.7rem 1rem;
     font-size: 0.9rem;
+}
+
+/* Main Hotel Card for Search Results */
+.search-result-main-card {
+    background: linear-gradient(135deg, var(--card-bg) 0%, rgba(79, 70, 229, 0.05) 100%);
+    border: 2px solid var(--primary);
+    border-radius: var(--radius-lg);
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 15px rgba(79, 70, 229, 0.15);
+}
+
+.search-result-main-card .result-thumbnail {
+    border-radius: var(--radius-lg);
+    border: 2px solid var(--primary);
+    overflow: hidden;
+}
+
+.search-result-main-card .rating-display {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-main);
+    margin: 0.5rem 0 1rem 0;
+}
+
+.search-result-main-card .btn-primary {
+    background: linear-gradient(135deg, var(--primary), #6366f1);
+    font-weight: 600;
+    padding: 1rem;
+    font-size: 1rem;
+    border: none;
+    transition: all 0.3s ease;
+}
+
+.search-result-main-card .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(79, 70, 229, 0.3);
+}
+
+/* Competitors Table */
+.competitors-table-container {
+    margin-top: 2rem;
+}
+
+.table-wrapper {
+    overflow-x: auto;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.competitors-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--card-bg);
+}
+
+.competitors-table thead {
+    background: linear-gradient(135deg, var(--primary), #6366f1);
+    color: white;
+}
+
+.competitors-table th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.95rem;
+    border-bottom: 2px solid var(--primary);
+}
+
+.competitors-table td {
+    padding: 1rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    vertical-align: middle;
+}
+
+.competitors-table tbody tr {
+    transition: background-color 0.2s ease;
+}
+
+.competitors-table tbody tr:hover {
+    background-color: rgba(79, 70, 229, 0.05);
+}
+
+.competitors-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.competitors-table .btn-small {
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 0.4rem;
+    text-decoration: none;
+    display: inline-block;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.competitors-table .btn-small:hover {
+    background: #4f46c9;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(79, 70, 229, 0.2);
+}
+
+/* Responsive Table */
+@media (max-width: 768px) {
+    .search-result-main-card {
+        padding: 1.5rem;
+    }
+    
+    .search-result-main-card > div {
+        display: flex !important;
+        flex-direction: column-reverse !important;
+        gap: 1.5rem !important;
+    }
+    
+    .competitors-table th,
+    .competitors-table td {
+        padding: 0.75rem;
+        font-size: 0.85rem;
+    }
+    
+    .competitors-table {
+        font-size: 0.85rem;
+    }
 }
 
 @media (max-width: 768px) {

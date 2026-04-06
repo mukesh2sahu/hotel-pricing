@@ -327,7 +327,7 @@ async function searchHotels(hotelName) {
 }
 
 /**
- * Display search results on the page
+ * Display search results on the page with main hotel + competitors table
  */
 function displaySearchResults(hotels) {
     const container = document.getElementById('search-results');
@@ -346,45 +346,108 @@ function displaySearchResults(hotels) {
     resultsSection.style.display = 'block';
     resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-    hotels.forEach((hotel) => {
-        const card = document.createElement('div');
-        card.className = 'search-result-card';
-        
-        const thumbnailUrl = hotel.thumbnail || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200"%3E%3Crect fill="%23ddd" width="400" height="200"/%3E%3Ctext x="50%25" y="50%25" font-size="18" text-anchor="middle" dy=".3em" fill="%23999"%3ENo Image%3C/text%3E%3C/svg%3E';
-        
-        let amenitiesHtml = '';
-        if (hotel.amenities && Array.isArray(hotel.amenities) && hotel.amenities.length > 0) {
-            const amenities = hotel.amenities.slice(0, 3);
-            amenitiesHtml = amenities.map(a => {
-                const escaped = (a || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                return `<span class="amenity-tag">${escaped}</span>`;
-            }).join('');
-        }
-        
-        const ratingHtml = hotel.rating ? `<small style="color: var(--text-muted);">★ ${hotel.rating} (${hotel.reviews || 0} ${hotel.reviews === 1 ? 'review' : 'reviews'})</small>` : '';
-        
-        const hotelName = (hotel.name || 'Hotel').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        const source = (hotel.source || 'Unknown').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        const price = formatPrice(parseFloat(hotel.price) || 0);
-        const link = (hotel.link || '#');
-        const linkAttr = link.startsWith('http') ? link : '#';
-        
-        card.innerHTML = `
-            <div class="result-thumbnail" style="background-image: url('${thumbnailUrl}');"></div>
-            <div class="result-info">
-                <div class="result-name">${hotelName}</div>
-                <div class="result-source">📌 Via ${source}</div>
-                ${ratingHtml}
-                <div class="result-price">${price}</div>
-                <div class="result-amenities">${amenitiesHtml}</div>
-                <a href="${linkAttr}" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="margin-top: 1rem; text-align: center; display: inline-block; width: 100%;">
-                    View Details
+    if (!hotels || hotels.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: var(--text-muted);">No hotels found</p>';
+        return;
+    }
+
+    // Main searched hotel
+    const mainHotel = hotels[0];
+    const mainHotelCard = document.createElement('div');
+    mainHotelCard.className = 'search-result-main-card';
+    
+    const thumbnailUrl = mainHotel.thumbnail || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200"%3E%3Crect fill="%23ddd" width="400" height="200"/%3E%3Ctext x="50%25" y="50%25" font-size="18" text-anchor="middle" dy=".3em" fill="%23999"%3ENo Image%3C/text%3E%3C/svg%3E';
+    
+    let amenitiesHtml = '';
+    if (mainHotel.amenities && Array.isArray(mainHotel.amenities) && mainHotel.amenities.length > 0) {
+        const amenities = mainHotel.amenities.slice(0, 5);
+        amenitiesHtml = amenities.map(a => {
+            const escaped = (a || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return `<span class="amenity-tag">${escaped}</span>`;
+        }).join('');
+    }
+    
+    const ratingHtml = mainHotel.rating ? `<div class="rating-display">⭐ ${mainHotel.rating} • ${mainHotel.reviews || 0} reviews</div>` : '';
+    const hotelName = (mainHotel.name || 'Hotel').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const source = (mainHotel.source || 'Unknown').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const price = formatPrice(parseFloat(mainHotel.price) || 0);
+    const link = (mainHotel.link || '#');
+    const linkAttr = link.startsWith('http') ? link : '#';
+    
+    mainHotelCard.innerHTML = `
+        <div style="display: grid; grid-template-columns: 350px 1fr; gap: 2rem; align-items: start;">
+            <div>
+                <div class="result-thumbnail" style="background-image: url('${thumbnailUrl}'); height: 250px; margin-bottom: 1rem;"></div>
+                <a href="${linkAttr}" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="width: 100%; text-align: center;">
+                    Book Now
                 </a>
             </div>
+            <div>
+                <h2 style="margin: 0 0 0.5rem 0; font-size: 1.8rem;">${hotelName}</h2>
+                <div class="result-source" style="margin-bottom: 0.5rem;">📌 ${source}</div>
+                ${ratingHtml}
+                <div class="result-price" style="font-size: 2.2rem; margin: 1rem 0;">
+                    ${price} <span style="font-size: 1rem; color: var(--text-muted);">per night</span>
+                </div>
+                <div class="result-amenities" style="margin-bottom: 1rem;">
+                    ${amenitiesHtml}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    container.appendChild(mainHotelCard);
+
+    // Competitors table (top 10)
+    const competitors = hotels.slice(1, 11);
+    if (competitors.length > 0) {
+        const tableContainer = document.createElement('div');
+        tableContainer.className = 'competitors-table-container';
+        tableContainer.innerHTML = `
+            <h3 style="margin-top: 3rem; margin-bottom: 1rem; font-size: 1.5rem;">Top Competitors (${competitors.length} hotels)</h3>
+            <div class="table-wrapper">
+                <table class="competitors-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 35%;">Hotel Name</th>
+                            <th style="width: 20%;">Price</th>
+                            <th style="width: 15%;">Rating</th>
+                            <th style="width: 15%;">Reviews</th>
+                            <th style="width: 15%;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
         `;
+
+        const tbody = tableContainer.querySelector('tbody');
         
-        container.appendChild(card);
-    });
+        competitors.forEach((hotel, index) => {
+            const row = document.createElement('tr');
+            const hotelPrice = formatPrice(parseFloat(hotel.price) || 0);
+            const competitorName = (hotel.name || 'N/A').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const competitorLink = hotel.link && hotel.link.startsWith('http') ? hotel.link : '#';
+            const ratingDisplay = hotel.rating ? `${hotel.rating} ⭐` : 'N/A';
+            const reviewsDisplay = hotel.reviews || 'N/A';
+            
+            row.innerHTML = `
+                <td style="font-weight: 500;">${competitorName}</td>
+                <td style="font-size: 1.1rem; font-weight: 600; color: var(--primary);">${hotelPrice}</td>
+                <td>${ratingDisplay}</td>
+                <td>${reviewsDisplay}</td>
+                <td>
+                    <a href="${competitorLink}" target="_blank" rel="noopener noreferrer" class="btn btn-small" style="padding: 0.5rem 1rem; font-size: 0.85rem;">
+                        View
+                    </a>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+
+        container.appendChild(tableContainer);
+    }
 }
 
 /**
