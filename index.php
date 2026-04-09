@@ -69,7 +69,7 @@
                         <h2>Search Results</h2>
                         <button id="clear-search-btn" class="btn btn-secondary" style="font-size: 0.9rem; padding: 0.5rem 1rem;">Back to All Hotels</button>
                     </div>
-                    <div id="search-results" class="hotel-grid"></div>
+                    <div id="search-results"></div>
                 </div>
                 
                 <div id="default-hotels-container">
@@ -198,6 +198,6 @@
         </div>
     </footer>
 
-    <script src="script.js?v=1.2"></script>
+    <script src="script.js?v=2.0"></script>
 </body>
 </html>

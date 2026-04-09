@@ -1291,3 +1291,130 @@ footer {
         font-size: 1.5rem;
     }
 }
+/* Search Matrix Table Styling - Professional Grid */
+.search-matrix-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    background: white;
+    margin-top: 1rem;
+    position: relative;
+    border: 2px solid #555;
+    border-radius: 4px;
+}
+
+.search-matrix-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    table-layout: fixed;
+    min-width: 1800px;
+}
+
+.search-matrix-table th, 
+.search-matrix-table td {
+    padding: 0.8rem 1rem;
+    border: 1px solid #ddd; /* Visible grid lines */
+    text-align: center;
+}
+
+.search-matrix-table thead th {
+    background: #f9cb9c; /* Peach header */
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    color: black;
+    font-weight: 700;
+    border-bottom: 2px solid #777;
+}
+
+.ota-header-cell {
+    background: #f9cb9c !important;
+    text-align: left !important;
+    padding-left: 1.5rem !important;
+    position: sticky;
+    left: 0;
+    z-index: 30 !important;
+    border-right: 2px solid #777 !important;
+}
+
+.ota-name-cell {
+    background: #f8fafc;
+    color: black;
+    font-weight: 600;
+    text-align: left !important;
+    padding-left: 1.5rem !important;
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    border-right: 2px solid #777 !important;
+}
+
+/* Zebra Striping */
+.search-matrix-table tbody tr:nth-child(even) td:not(.ota-name-cell) {
+    background-color: #fdfdfd;
+}
+
+.search-matrix-table tbody tr:hover td:not(.ota-name-cell) {
+    background-color: #f1f5f9;
+}
+
+.hotel-th-name {
+    font-size: 0.95rem;
+    white-space: wrap;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.orig-name {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #475569;
+    background: rgba(0,0,0,0.05);
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.highlight-comp {
+    background: #ffd966 !important; /* Yellow highlight */
+}
+
+.main-hotel-td {
+    background: rgba(79, 70, 229, 0.03); /* Slight tint for main hotel column */
+}
+
+/* Lowest Price Highlight */
+.lowest-price-match {
+    background-color: #ecfdf5 !important;
+    color: #065f46;
+}
+
+.lowest-price-match .matrix-price {
+    font-weight: 800;
+}
+
+.matrix-price {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+}
+
+/* Summary Rows Styling */
+.summary-row {
+    background-color: #f1f5f9 !important;
+    border-top: 2px solid #777 !important;
+}
+
+.summary-label {
+    background-color: #e2e8f0 !important;
+    font-weight: 800 !important;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+}
+
+.summary-row td {
+    font-size: 1rem;
+    color: var(--primary);
+}

@@ -327,7 +327,7 @@ async function searchHotels(hotelName) {
 }
 
 /**
- * Display search results on the page with main hotel + competitors table
+ * Display search results as a comparison matrix (Main Hotel + Competitors vs OTAs)
  */
 function displaySearchResults(hotels) {
     const container = document.getElementById('search-results');
@@ -351,103 +351,157 @@ function displaySearchResults(hotels) {
         return;
     }
 
-    // Main searched hotel
-    const mainHotel = hotels[0];
-    const mainHotelCard = document.createElement('div');
-    mainHotelCard.className = 'search-result-main-card';
-    
-    const thumbnailUrl = mainHotel.thumbnail || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200"%3E%3Crect fill="%23ddd" width="400" height="200"/%3E%3Ctext x="50%25" y="50%25" font-size="18" text-anchor="middle" dy=".3em" fill="%23999"%3ENo Image%3C/text%3E%3C/svg%3E';
-    
-    let amenitiesHtml = '';
-    if (mainHotel.amenities && Array.isArray(mainHotel.amenities) && mainHotel.amenities.length > 0) {
-        const amenities = mainHotel.amenities.slice(0, 5);
-        amenitiesHtml = amenities.map(a => {
-            const escaped = (a || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            return `<span class="amenity-tag">${escaped}</span>`;
-        }).join('');
-    }
-    
-    const ratingHtml = mainHotel.rating ? `<div class="rating-display">⭐ ${mainHotel.rating} • ${mainHotel.reviews || 0} reviews</div>` : '';
-    const hotelName = (mainHotel.name || 'Hotel').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const source = (mainHotel.source || 'Unknown').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const price = formatPrice(parseFloat(mainHotel.price) || 0);
-    const link = (mainHotel.link || '#');
-    const linkAttr = link.startsWith('http') ? link : '#';
-    
-    mainHotelCard.innerHTML = `
-        <div style="display: grid; grid-template-columns: 350px 1fr; gap: 2rem; align-items: start;">
-            <div>
-                <div class="result-thumbnail" style="background-image: url('${thumbnailUrl}'); height: 250px; margin-bottom: 1rem;"></div>
-                <a href="${linkAttr}" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="width: 100%; text-align: center;">
-                    Book Now
-                </a>
-            </div>
-            <div>
-                <h2 style="margin: 0 0 0.5rem 0; font-size: 1.8rem;">${hotelName}</h2>
-                <div class="result-source" style="margin-bottom: 0.5rem;">📌 ${source}</div>
-                ${ratingHtml}
-                <div class="result-price" style="font-size: 2.2rem; margin: 1rem 0;">
-                    ${price} <span style="font-size: 1rem; color: var(--text-muted);">per night</span>
-                </div>
-                <div class="result-amenities" style="margin-bottom: 1rem;">
-                    ${amenitiesHtml}
-                </div>
-            </div>
-        </div>
-    `;
-    
-    container.appendChild(mainHotelCard);
+    // Define OTAs to show in rows
+    const OTAs = [
+        "Hotel Website", "Agoda", "Expedia", "Booking.com", "MMT",
+        "Goibibo", "Trip.com", "Ticket.com", "Traveloka", "Hotels.com",
+        "Airbnb", "Hotelbeds.com", "Tripadvisor", "12go.asia"
+    ];
 
-    // Competitors table (top 10)
-    const competitors = hotels.slice(1, 11);
-    if (competitors.length > 0) {
-        const tableContainer = document.createElement('div');
-        tableContainer.className = 'competitors-table-container';
-        tableContainer.innerHTML = `
-            <h3 style="margin-top: 3rem; margin-bottom: 1rem; font-size: 1.5rem;">Top Competitors (${competitors.length} hotels)</h3>
-            <div class="table-wrapper">
-                <table class="competitors-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 35%;">Hotel Name</th>
-                            <th style="width: 20%;">Price</th>
-                            <th style="width: 15%;">Rating</th>
-                            <th style="width: 15%;">Reviews</th>
-                            <th style="width: 15%;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    </tbody>
-                </table>
-            </div>
-        `;
+    // Prepare hotels (Main + top 10 competitors)
+    // ONLY use hotels returned by the API
+    const finalDisplayHotels = hotels.slice(0, 11);
 
-        const tbody = tableContainer.querySelector('tbody');
+    // Create the matrix table container
+    const tableWrapper = document.createElement('div');
+    tableWrapper.className = 'search-matrix-wrapper';
+    
+    const table = document.createElement('table');
+    table.className = 'search-matrix-table';
+    
+    // Create Header (Hotel Names)
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    
+    // OTA Name corner cell
+    const cornerTh = document.createElement('th');
+    cornerTh.innerText = 'OTA Name';
+    cornerTh.className = 'ota-header-cell';
+    headerRow.appendChild(cornerTh);
+    
+    // Hotel columns
+    finalDisplayHotels.forEach((hotel, index) => {
+        const th = document.createElement('th');
+        if (index === 0) {
+            th.innerHTML = `<div class="hotel-th-content"><span class="hotel-th-name">Main Hotel (Example ${hotel.name})</span></div>`;
+            th.className = 'main-hotel-th';
+        } else {
+            th.innerHTML = `<div class="hotel-th-content"><span class="hotel-th-name">Compitition ${index}</span><small class="orig-name">${hotel.name}</small></div>`;
+            th.className = 'comp-hotel-th';
+            if (index === 1) th.classList.add('highlight-comp');
+        }
+        headerRow.appendChild(th);
+    });
+    
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+    
+    // Create Body (OTA Prices)
+    const tbody = document.createElement('tbody');
+    
+    OTAs.forEach(ota => {
+        const tr = document.createElement('tr');
         
-        competitors.forEach((hotel, index) => {
-            const row = document.createElement('tr');
-            const hotelPrice = formatPrice(parseFloat(hotel.price) || 0);
-            const competitorName = (hotel.name || 'N/A').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            const competitorLink = hotel.link && hotel.link.startsWith('http') ? hotel.link : '#';
-            const ratingDisplay = hotel.rating ? `${hotel.rating} ⭐` : 'N/A';
-            const reviewsDisplay = hotel.reviews || 'N/A';
+        // OTA name cell
+        const otaTd = document.createElement('td');
+        otaTd.className = 'ota-name-cell';
+        otaTd.innerText = ota;
+        tr.appendChild(otaTd);
+        
+        // Price cells for each hotel
+        finalDisplayHotels.forEach((hotel, hIndex) => {
+            const priceTd = document.createElement('td');
+            priceTd.className = hIndex === 0 ? 'main-hotel-td' : 'comp-hotel-td';
             
-            row.innerHTML = `
-                <td style="font-weight: 500;">${competitorName}</td>
-                <td style="font-size: 1.1rem; font-weight: 600; color: var(--primary);">${hotelPrice}</td>
-                <td>${ratingDisplay}</td>
-                <td>${reviewsDisplay}</td>
-                <td>
-                    <a href="${competitorLink}" target="_blank" rel="noopener noreferrer" class="btn btn-small" style="padding: 0.5rem 1rem; font-size: 0.85rem;">
-                        View
-                    </a>
-                </td>
-            `;
-            tbody.appendChild(row);
-        });
+            let priceData = null;
+            if (hotel.prices && hotel.prices[ota]) {
+                priceData = hotel.prices[ota];
+            } else if (hotel.prices) {
+                for (let provider in hotel.prices) {
+                    if (provider.toLowerCase().includes(ota.toLowerCase()) || 
+                        ota.toLowerCase().includes(provider.toLowerCase())) {
+                        priceData = hotel.prices[provider];
+                        break;
+                    }
+                }
+            }
 
-        container.appendChild(tableContainer);
-    }
+            let displayPrice = 'N/A';
+            let url = '#';
+            let rate = 0;
+            
+            if (priceData) {
+                rate = priceData.rate;
+                displayPrice = formatPrice(rate);
+                url = priceData.url || '#';
+            }
+            
+            priceTd.dataset.rate = rate;
+            priceTd.innerHTML = `<span class="matrix-price" onclick="if('${url}' !== '#') window.open('${url}', '_blank')">${displayPrice}</span>`;
+            tr.appendChild(priceTd);
+        });
+        
+        tbody.appendChild(tr);
+    });
+
+    // Add Highlight for Lowest Price in each Column
+    setTimeout(() => {
+        const rowCount = tbody.rows.length;
+        const colCount = finalDisplayHotels.length;
+        
+        for (let j = 1; j <= colCount; j++) {
+            let minRate = Infinity;
+            let minTd = null;
+            
+            for (let i = 0; i < rowCount; i++) {
+                const td = tbody.rows[i].cells[j];
+                const rate = parseFloat(td.dataset.rate);
+                if (rate > 0 && rate < minRate) {
+                    minRate = rate;
+                    minTd = td;
+                }
+            }
+            
+            if (minTd) {
+                minTd.classList.add('lowest-price-match');
+                minTd.querySelector('.matrix-price').innerHTML += ' <i class="ph-tag-fill" title="Lowest in Market" style="color:#22c55e"></i>';
+            }
+        }
+    }, 100);
+
+    // Add Summary Rows
+    const summaryRows = ['Minimum', 'Maximum', 'Average'];
+    summaryRows.forEach(label => {
+        const tr = document.createElement('tr');
+        tr.className = 'summary-row';
+        
+        const labelTd = document.createElement('td');
+        labelTd.className = 'ota-name-cell summary-label';
+        labelTd.innerText = label;
+        tr.appendChild(labelTd);
+        
+        finalDisplayHotels.forEach((hotel, hIndex) => {
+            const sumTd = document.createElement('td');
+            sumTd.className = hIndex === 0 ? 'main-hotel-td' : 'comp-hotel-td';
+            
+            const rates = Object.values(hotel.prices).map(p => p.rate).filter(r => r > 0);
+            let value = 0;
+            
+            if (rates.length > 0) {
+                if (label === 'Minimum') value = Math.min(...rates);
+                else if (label === 'Maximum') value = Math.max(...rates);
+                else value = rates.reduce((a, b) => a + b, 0) / rates.length;
+            }
+            
+            sumTd.innerHTML = `<strong>${formatPrice(value)}</strong>`;
+            tr.appendChild(sumTd);
+        });
+        tbody.appendChild(tr);
+    });
+    
+    table.appendChild(tbody);
+    tableWrapper.appendChild(table);
+    container.appendChild(tableWrapper);
 }
 
 /**

@@ -47,16 +47,16 @@ function searchHotels($hotelName, $checkInDaysFromNow = 14) {
     }
     
     $hotels = [];
-    $hotelNames = []; // Track unique hotel names to avoid duplicates
+    $hotelMap = []; // Grouping by hotel name to aggregate OTA prices
     
     // Extract hotels from ads section (these have OTA prices and provider names)
     if (isset($data['ads']) && is_array($data['ads'])) {
         foreach ($data['ads'] as $ad) {
             $name = $ad['name'] ?? 'N/A';
-            if (!isset($hotelNames[$name])) {
-                $hotel = [
+            if (!isset($hotelMap[$name])) {
+                $hotelMap[$name] = [
                     'name' => $name,
-                    'price' => str_replace('$', '', $ad['price'] ?? 'N/A'),
+                    'prices' => [], // To store OTA: price
                     'source' => $ad['source'] ?? 'Unknown',
                     'link' => $ad['link'] ?? null,
                     'thumbnail' => $ad['thumbnail'] ?? null,
@@ -65,21 +65,29 @@ function searchHotels($hotelName, $checkInDaysFromNow = 14) {
                     'hotel_class' => $ad['hotel_class'] ?? null,
                     'amenities' => $ad['amenities'] ?? []
                 ];
-                $hotels[] = $hotel;
-                $hotelNames[$name] = true;
+            }
+            
+            if (isset($ad['price']) && isset($ad['source'])) {
+                // Remove everything except digits and decimal point
+                $price = preg_replace('/[^\d.]/', '', (string)$ad['price']);
+                if (!empty($price)) {
+                    $hotelMap[$name]['prices'][$ad['source']] = [
+                        'rate' => (float)$price,
+                        'url' => $ad['link'] ?? null
+                    ];
+                }
             }
         }
     }
     
-    // Also get hotels from properties section (for comprehensive results)
+    // Also get hotels from properties section
     if (isset($data['properties']) && is_array($data['properties'])) {
         foreach ($data['properties'] as $property) {
             $name = $property['name'] ?? 'N/A';
-            // Only add if not already in list (avoid duplicates)
-            if (!isset($hotelNames[$name])) {
-                $hotel = [
+            if (!isset($hotelMap[$name])) {
+                $hotelMap[$name] = [
                     'name' => $name,
-                    'price' => $property['rate_per_night']['extracted_lowest'] ?? 'N/A',
+                    'prices' => [],
                     'source' => 'Google Hotels',
                     'link' => $property['link'] ?? null,
                     'thumbnail' => isset($property['images'][0]) ? $property['images'][0]['thumbnail'] : null,
@@ -88,10 +96,62 @@ function searchHotels($hotelName, $checkInDaysFromNow = 14) {
                     'hotel_class' => $property['hotel_class'] ?? null,
                     'amenities' => $property['amenities'] ?? []
                 ];
-                $hotels[] = $hotel;
-                $hotelNames[$name] = true;
+            }
+            
+            // Add properties-specific prices if available (Google often nests OTA prices here)
+            if (isset($property['ads']) && is_array($property['ads'])) {
+                foreach ($property['ads'] as $pAd) {
+                    if (isset($pAd['price']) && isset($pAd['source'])) {
+                        $pPrice = preg_replace('/[^\d.]/', '', (string)$pAd['price']);
+                        if (!empty($pPrice)) {
+                            $hotelMap[$name]['prices'][$pAd['source']] = [
+                                'rate' => (float)$pPrice,
+                                'url' => $pAd['link'] ?? null
+                            ];
+                        }
+                    }
+                }
+            }
+
+            // Also check other_rate_per_night if it exists
+            if (isset($property['other_rate_per_night']) && is_array($property['other_rate_per_night'])) {
+                foreach ($property['other_rate_per_night'] as $otherRate) {
+                     if (isset($otherRate['rate']) && isset($otherRate['source'])) {
+                        $pPrice = preg_replace('/[^\d.]/', '', (string)$otherRate['rate']);
+                        if (!empty($pPrice)) {
+                            $hotelMap[$name]['prices'][$otherRate['source']] = [
+                                'rate' => (float)$pPrice,
+                                'url' => $otherRate['link'] ?? null
+                            ];
+                        }
+                    }
+                }
+            }
+            
+            // Add the lowest rate as a 'Google Hotels' price if no other price found for this OTA
+            if (isset($property['rate_per_night']['lowest'])) {
+                 $price = preg_replace('/[^\d.]/', '', (string)$property['rate_per_night']['lowest']);
+                 if (!empty($price) && !isset($hotelMap[$name]['prices']['Google Hotels'])) {
+                    $hotelMap[$name]['prices']['Google Hotels'] = [
+                        'rate' => (float)$price,
+                        'url' => $property['link'] ?? null
+                    ];
+                 }
+            } else if (isset($property['rate_per_night']['extracted_lowest'])) {
+                $price = (float)$property['rate_per_night']['extracted_lowest'];
+                if ($price > 0 && !isset($hotelMap[$name]['prices']['Google Hotels'])) {
+                    $hotelMap[$name]['prices']['Google Hotels'] = [
+                        'rate' => $price,
+                        'url' => $property['link'] ?? null
+                    ];
+                }
             }
         }
+    }
+
+    // Convert map to indexed array
+    foreach ($hotelMap as $hotel) {
+        $hotels[] = $hotel;
     }
     
     return $hotels;
