@@ -4,200 +4,374 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hotel Price Comparison | SkyCompare</title>
+    <title>RateIntel | Hotel Intelligence Dashboard</title>
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
-    <script src="https://unpkg.com/phosphor-icons"></script>
+    <!-- Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="stylesheet" href="style.css?v=<?php echo time(); ?>">
 </head>
-<body>
-    <div class="background-blobs"></div>
-    <header>
-        <div class="container nav-container">
-            <div class="logo">
-                <i class="ph-buildings-fill"></i>
-                <span>SkyCompare</span>
-            </div>
-            <nav>
-                <a href="#">Home</a>
-                <a href="#">Deals</a>
-                <a href="#">About</a>
-                <div class="currency-selector">
-                    <i class="ph-currency-circle-dollar"></i>
-                    <select id="currency-select" onchange="changeCurrency(this.value)">
-                        <option value="THB" selected>THB (฿)</option>
-                        <option value="USD">USD ($)</option>
-                        <option value="EUR">EUR (€)</option>
-                        <option value="GBP">GBP (£)</option>
-                        <option value="JPY">JPY (¥)</option>
-                        <option value="SGD">SGD (S$)</option>
-                        <option value="AUD">AUD (A$)</option>
-                        <option value="INR">INR (₹)</option>
-                    </select>
+<body class="dashboard-body">
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i class="ph-fill ph-buildings"></i>
+                    <div class="brand-info">
+                        <span class="brand-name">RateIntel</span>
+                        <span class="brand-tagline">HOTEL INTELLIGENCE</span>
+                    </div>
                 </div>
-                <button class="btn btn-primary">Sign In</button>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="javascript:void(0)" class="nav-link active" onclick="switchView('dashboard', this)">
+                    <i class="ph-fill ph-squares-four"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="javascript:void(0)" class="nav-link" onclick="switchView('rate-comparison', this)">
+                    <i class="ph-fill ph-chart-bar"></i>
+                    <span>Rate Comparison</span>
+                </a>
+                <a href="javascript:void(0)" class="nav-link" onclick="switchView('smart-pricing', this)">
+                    <i class="ph-fill ph-lightning"></i>
+                    <span>Smart Pricing</span>
+                </a>
+                <a href="javascript:void(0)" class="nav-link" onclick="switchView('rate-parity', this)">
+                    <i class="ph-fill ph-arrows-left-right"></i>
+                    <span>Rate Parity</span>
+                </a>
+                <a href="javascript:void(0)" class="nav-link" onclick="switchView('heatmap', this)">
+                    <i class="ph-fill ph-grid-nine"></i>
+                    <span>Heatmap</span>
+                </a>
+                <a href="javascript:void(0)" class="nav-link" onclick="switchView('alerts', this)">
+                    <i class="ph-fill ph-bell"></i>
+                    <span>Alerts</span>
+                    <span class="nav-badge">3</span>
+                </a>
             </nav>
-        </div>
-    </header>
-
-    <main>
-        <section class="hero">
-            <div class="container hero-content">
-                <h1>Find the Best Hotel Deals Instantly</h1>
-                <p>Compare prices across top travel websites and discover the best value for your next stay.</p>
-                
-                <!-- Search Form -->
-                <div class="search-box">
-                    <div class="search-input-group">
-                        <i class="ph-magnifying-glass"></i>
-                        <input type="text" id="hotel-search" placeholder="Search for a hotel..." />
-                        <button id="search-btn" class="btn btn-primary">Search</button>
-                    </div>
-                    <div id="search-loading" style="display:none; text-align: center; margin-top: 10px;">
-                        <p>Searching hotels...</p>
-                    </div>
-                    <div id="search-error" style="display:none; color: #e74c3c; margin-top: 10px; text-align: center;"></div>
-                </div>
+            
+            <div class="sidebar-footer">
+                <a href="javascript:void(0)" class="nav-link" onclick="switchView('properties', this)">
+                    <i class="ph-fill ph-house"></i>
+                    <span>Properties</span>
+                </a>
+                <a href="javascript:void(0)" class="nav-link" onclick="switchView('export', this)">
+                    <i class="ph-fill ph-export"></i>
+                    <span>Export</span>
+                </a>
             </div>
-        </section>
+        </aside>
 
-        <section class="hotel-list-section">
-            <div class="container">
-                <div id="search-results-container" style="display:none;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                        <h2>Search Results</h2>
-                        <button id="clear-search-btn" class="btn btn-secondary" style="font-size: 0.9rem; padding: 0.5rem 1rem;">Back to All Hotels</button>
-                    </div>
-                    <div id="search-results"></div>
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Navigation -->
+            <header class="top-nav">
+                <div class="live-status">
+                    <span class="pulse-dot"></span>
+                    <span>Live - Refreshing every 60s</span>
                 </div>
                 
-                <div id="default-hotels-container">
-                    <div class="hotel-grid">
-                    <?php foreach ($hotels as $hotel): ?>
-                        <div class="hotel-card" id="hotel-<?php echo $hotel['id']; ?>">
-                            <div class="hotel-image" style="background-image: url('<?php echo $hotel['image']; ?>');">
-                                <div class="rating-badge">
-                                    <i class="ph-star-fill"></i>
-                                    <?php echo $hotel['rating']; ?>
-                                </div>
-                            </div>
-                            <div class="hotel-info">
-                                <h3 class="hotel-name" onclick="toggleDropdown(<?php echo $hotel['id']; ?>)">
-                                    <?php echo $hotel['name']; ?>
-                                    <i class="ph-caret-down toggle-icon"></i>
-                                </h3>
-                                <p class="hotel-location">
-                                    <i class="ph-map-pin"></i>
-                                    <?php echo $hotel['location']; ?>
-                                </p>
-                                
-                                <div class="dropdown-content" id="dropdown-<?php echo $hotel['id']; ?>">
-                                    <div class="comparison-grid">
-                                        <div class="price-comparison">
-                                            <h4>Current Market Prices</h4>
-                                            <ul class="price-list">
-                                                <!-- Populated by JS -->
-                                            </ul>
-                                        </div>
-                                        <div class="competitor-comparison">
-                                            <div class="competitors-sidebar">
-                                                <h4><i class="ph-users-three"></i> Close Competitors</h4>
-                                                <div class="comp-mini-list">
-                                                    <!-- Populated by JS -->
-                                                </div>
-                                                <button class="btn btn-secondary comp-btn-full" 
-                                                        onclick="openRateShopper(<?php echo $hotel['id']; ?>)">
-                                                    <i class="ph-table"></i> Rate Shopper Table
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                <div class="search-bar">
+                    <div class="search-field">
+                        <i class="ph ph-magnifying-glass"></i>
+                        <input type="text" id="hotel-search" placeholder="Hotel name (e.g. Burj Al Arab)">
+                    </div>
+                    <div class="search-field">
+                        <i class="ph ph-map-pin"></i>
+                        <input type="text" id="location-search" placeholder="City or country">
+                    </div>
+                    <div class="search-field date-field">
+                        <i class="ph ph-calendar"></i>
+                        <input type="text" id="checkin-date" placeholder="dd/mm/yyyy" onfocus="(this.type='date')">
+                    </div>
+                    <div class="search-field date-field">
+                        <i class="ph ph-calendar"></i>
+                        <input type="text" id="checkout-date" placeholder="dd/mm/yyyy" onfocus="(this.type='date')">
+                    </div>
+                    <button class="search-submit" id="search-btn">
+                        <i class="ph ph-magnifying-glass"></i>
+                        <span>Search</span>
+                    </button>
+                </div>
+                
+                <div class="header-actions">
+                    <div class="notification-bell">
+                        <i class="ph-fill ph-bell"></i>
+                        <span class="bell-dot"></span>
+                    </div>
+                    <div class="currency-selector">
+                        <select id="currency-select" onchange="changeCurrency(this.value)">
+                            <option value="SGD">SGD</option>
+                            <option value="USD">USD</option>
+                            <option value="THB">THB</option>
+                            <option value="INR">INR</option>
+                        </select>
+                        <i class="ph ph-caret-down"></i>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Dashboard Content -->
+            <div id="dashboard-view" class="view-section">
+                <div class="dashboard-header">
+                    <div class="header-left">
+                        <h1>Dashboard</h1>
+                        <p id="monitoring-text">Monitoring 11 hotels across 14 OTA platforms</p>
+                    </div>
+                    <div class="header-right">
+                        <div class="update-timer">
+                            <i class="ph ph-clock"></i>
+                            <span>61s</span>
+                        </div>
+                        <button class="btn-refresh" id="refresh-now">
+                            Refresh Now
+                        </button>
+                    </div>
+                </div>
+
+                <!-- KPI Cards -->
+                <div class="kpi-grid">
+                    <div class="kpi-card your-rate">
+                        <div class="kpi-content">
+                            <span class="kpi-label">YOUR RATE</span>
+                            <h2 id="your-rate-val">SGD 378</h2>
+                            <p class="kpi-trend trend-up">
+                                <i class="ph ph-trend-up"></i>
+                                1.5% vs 24h ago
+                            </p>
+                        </div>
+                        <div class="kpi-icon">
+                            <i class="ph-fill ph-currency-dollar"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="kpi-card market-avg">
+                        <div class="kpi-content">
+                            <span class="kpi-label">MARKET AVG</span>
+                            <h2 id="market-avg-val">SGD 390</h2>
+                            <p class="kpi-sub">Across all OTAs</p>
+                        </div>
+                        <div class="kpi-icon">
+                            <i class="ph-fill ph-chart-line"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="kpi-card recommended">
+                        <div class="kpi-content">
+                            <span class="kpi-label">RECOMMENDED</span>
+                            <h2 id="recommended-val">SGD 401</h2>
+                            <p class="kpi-sub">AI-powered suggestion</p>
+                        </div>
+                        <div class="kpi-icon">
+                            <i class="ph-fill ph-sparkle"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="kpi-card parity-issues">
+                        <div class="kpi-content">
+                            <span class="kpi-label">PARITY ISSUES</span>
+                            <h2 id="parity-issues-val">12</h2>
+                            <p class="kpi-trend trend-down">Needs attention</p>
+                        </div>
+                        <div class="kpi-icon">
+                            <i class="ph-fill ph-warning"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts and Alerts Grid -->
+                <div class="main-grid">
+                    <!-- Rate Overview -->
+                    <div class="panel rate-overview">
+                        <div class="panel-header">
+                            <h3>Your Property Rate Overview</h3>
+                            <a href="#" class="panel-link">View All <i class="ph ph-arrow-right"></i></a>
+                        </div>
+                        <div class="panel-body">
+                            <div class="property-title">The Grand Palace Hotel</div>
+                            <div class="rate-chart-container" id="rate-overview-container">
+                                <!-- Bars will be injected here -->
                             </div>
                         </div>
-                    <?php endforeach; ?>
+                    </div>
+
+                    <!-- Recent Alerts -->
+                    <div class="panel recent-alerts">
+                        <div class="panel-header">
+                            <h3>Recent Alerts <span class="badge" style="background:#ef4444; color:white; font-size:0.65rem; padding:2px 8px; border-radius:20px; font-weight:700; margin-left:8px">3 new</span></h3>
+                            <a href="#" class="panel-link">View All <i class="ph ph-arrow-right"></i></a>
+                        </div>
+                        <div class="panel-body">
+                            <div class="alerts-list" id="alerts-container">
+                                <!-- Alerts will be injected here -->
+                            </div>
+                        </div>
+                    </div>
                 </div>
+
+                <!-- Competitors Section -->
+                <div class="competitors-section">
+                    <div class="section-header">
+                        <h3>Top Competitors</h3>
+                        <a href="#" class="panel-link">Full Comparison <i class="ph ph-caret-right"></i></a>
+                    </div>
+                    <div class="competitors-grid" id="competitors-row-container">
+                        <!-- Competitor cards will be injected here -->
+                    </div>
                 </div>
             </div>
-        </section>
 
-        <section class="rate-shopper-section" id="rate-shopper-section" style="display: none;">
-            <div class="container">
-                <div class="rate-shopper-card">
-                    <div class="rate-shopper-header">
-                        <div class="header-info">
-                            <h2 id="shopper-hotel-name">Rate Shopper - JW Marriott</h2>
-                            <p><i class="ph-clock-fill"></i> Real-time price comparison across all major OTAs and competitors. <span class="sync-badge">Last Synced: Just now</span></p>
-                        </div>
+            <!-- Rate Comparison View -->
+            <div id="rate-comparison-view" class="view-section" style="display: none;">
+                <div class="dashboard-header">
+                    <div class="header-left">
+                        <h1>Rate Comparison Matrix</h1>
+                        <p>Real-time comparison of all monitored properties across all platforms</p>
+                    </div>
+                    <div class="header-right">
                         <div class="header-actions">
-                            <button class="btn btn-export"><i class="ph-file-pdf"></i> PDF</button>
-                            <button class="btn btn-export"><i class="ph-file-xls"></i> Excel</button>
-                            <button class="btn btn-primary" onclick="closeRateShopper()"><i class="ph-x"></i> Close</button>
+                            <button class="btn-refresh" style="background: #10b981; margin-right: 0.5rem;"><i class="ph ph-file-xls"></i> Export Excel</button>
+                            <button class="btn-refresh" onclick="refreshDashboard()">Refresh Data</button>
                         </div>
                     </div>
+                </div>
+                
+                <div class="matrix-container">
                     <div class="table-responsive">
-                        <table class="rate-shopper-table" id="rate-shopper-table">
+                        <table class="comparison-matrix" id="comparison-matrix-table">
                             <thead>
-                                <tr id="shopper-thead-row">
+                                <tr id="matrix-header-row">
                                     <!-- Populated by JS -->
                                 </tr>
                             </thead>
-                            <tbody id="shopper-tbody">
+                            <tbody id="matrix-body">
                                 <!-- Populated by JS -->
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
-        </section>
 
-        <section class="market-intelligence">
-             <div class="container">
-                <div class="intel-card">
-                    <div class="intel-header">
-                        <h2><i class="ph-chart-line-up-fill"></i> Market Intelligence Overview</h2>
-                        <p>Real-time performance tracking of Top 10 Industry competitors within 20km.</p>
-                    </div>
-                    <div class="intel-grid">
-                        <div class="intel-item">
-                            <span class="intel-label">Total Competitors Tracked</span>
-                            <span class="intel-value">40+ Properties</span>
-                        </div>
-                        <div class="intel-item">
-                            <span class="intel-label">Market Sync Frequency</span>
-                            <span class="intel-value">60 Seconds</span>
-                        </div>
-                        <div class="intel-item">
-                            <span class="intel-label">Scanning Intensity</span>
-                            <span class="intel-value">14+ Global Sources</span>
-                        </div>
+            <!-- Smart Pricing View -->
+            <div id="smart-pricing-view" class="view-section" style="display: none;">
+                <div class="dashboard-header">
+                    <div class="header-left">
+                        <h1>Smart Pricing Engine</h1>
+                        <p>AI-driven price recommendations based on real-time market data</p>
                     </div>
                 </div>
-             </div>
-        </section>
-    </main>
+                
+                <div class="smart-pricing-grid" id="smart-pricing-container">
+                    <!-- Pricing cards will be injected here -->
+                </div>
+            </div>
 
-    <!-- Modal for Competitors -->
-    <div id="comp-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-modal">&times;</span>
-            <div class="modal-header">
-                <h2>Top 10 Market Competitors</h2>
-                <span class="modal-subtitle">Direct competitors within a 20km radius</span>
+            <!-- Rate Parity View -->
+            <div id="rate-parity-view" class="view-section" style="display: none;">
+                <div class="dashboard-header">
+                    <div class="header-left">
+                        <h1>Rate Parity Analysis</h1>
+                        <p>Analyze price consistency across all OTA platforms and your direct channel</p>
+                    </div>
+                </div>
+                <div class="panel parity-matrix-panel">
+                    <div id="parity-container">
+                        <!-- Parity violations will be injected here -->
+                    </div>
+                </div>
             </div>
-            <div id="competitor-list" class="competitor-grid">
-                <!-- Competitors will show up here -->
+
+            <!-- Heatmap View -->
+            <div id="heatmap-view" class="view-section" style="display: none;">
+                <div class="dashboard-header">
+                    <div class="header-left">
+                        <h1>Market Heatmap</h1>
+                        <p>Visualizing pricing intensity and demand forecast for the next 30 days</p>
+                    </div>
+                </div>
+                <div class="panel heatmap-panel">
+                    <div id="heatmap-container" class="heatmap-grid">
+                        <!-- Heatmap cells will be injected here -->
+                    </div>
+                    <div class="heatmap-legend">
+                        <span>Low Intensity</span>
+                        <div class="legend-bar"></div>
+                        <span>High Intensity</span>
+                    </div>
+                </div>
             </div>
-        </div>
+
+            <!-- Alerts View -->
+            <div id="alerts-view" class="view-section" style="display: none;">
+                <div class="dashboard-header">
+                    <div class="header-left">
+                        <h1>Global Alerts Center</h1>
+                        <p>Track all price drops, parity violations, and competitor strategy shifts</p>
+                    </div>
+                </div>
+                <div class="alerts-full-list" id="alerts-full-container">
+                    <!-- Historical alerts will be injected here -->
+                </div>
+            </div>
+
+            <!-- Properties Management View -->
+            <div id="properties-view" class="view-section" style="display: none;">
+                <div class="dashboard-header">
+                    <div class="header-left">
+                        <h1>Property Management</h1>
+                        <p>Manage your hotel portfolio and monitoring settings</p>
+                    </div>
+                    <div class="header-right">
+                        <button class="btn-refresh" style="background:#10b981"><i class="ph ph-plus"></i> Add New Property</button>
+                    </div>
+                </div>
+                <div class="properties-grid" id="properties-container">
+                    <!-- Property cards will be injected here -->
+                </div>
+            </div>
+
+            <!-- Export Data View -->
+            <div id="export-view" class="view-section" style="display: none;">
+                <div class="dashboard-header">
+                    <div class="header-left">
+                        <h1>Export & Reports</h1>
+                        <p>Generate intelligence reports for stakeholders</p>
+                    </div>
+                </div>
+                <div class="export-options-grid">
+                    <div class="panel export-card">
+                        <i class="ph ph-file-pdf"></i>
+                        <h3>PDF Executive Summary</h3>
+                        <p>Complete dashboard overview with charts</p>
+                        <button class="btn-refresh" onclick="alert('PDF Generated!')">Generate PDF</button>
+                    </div>
+                    <div class="panel export-card">
+                        <i class="ph ph-file-xls"></i>
+                        <h3>Excel Price Matrix</h3>
+                        <p>Raw pricing data across all OTAs</p>
+                        <button class="btn-refresh" style="background:#10b981" onclick="alert('Excel Exported!')">Download Excel</button>
+                    </div>
+                    <div class="panel export-card">
+                        <i class="ph ph-file-csv"></i>
+                        <h3>CSV Parity Log</h3>
+                        <p>Historical parity violation records</p>
+                        <button class="btn-refresh" style="background:#64748b" onclick="alert('CSV Downloaded!')">Download CSV</button>
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
 
-    <footer>
-        <div class="container footer-content">
-            <p>&copy; 2026 SkyCompare. All rights reserved.</p>
-        </div>
-    </footer>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="spinner"></div>
+    </div>
 
-    <script src="script.js?v=2.0"></script>
+    <script src="script.js?v=<?php echo time(); ?>"></script>
 </body>
 </html>

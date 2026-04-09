@@ -1,584 +1,626 @@
+// State management
 let hotelLiveData = [];
-let currentCurrency = 'THB';
+let currentCurrency = 'SGD';
+let lastSearchQuery = null;
+let refreshCountdown = 60;
+let refreshInterval = null;
 
 const exchangeRates = {
-    'THB': 36.5,
-    'USD': 1.0,
-    'EUR': 0.92,
-    'GBP': 0.79,
-    'JPY': 151.4,
-    'SGD': 1.35,
-    'AUD': 1.53,
-    'INR': 83.2
+    'SGD': 1.0,
+    'USD': 0.74,
+    'THB': 26.5,
+    'INR': 63.4
 };
 
 const currencySymbols = {
-    'THB': '฿',
-    'USD': '$',
-    'EUR': '€',
-    'GBP': '£',
-    'JPY': '¥',
-    'SGD': 'S$',
-    'AUD': 'A$',
+    'SGD': 'SGD',
+    'USD': 'USD',
+    'THB': 'THB',
     'INR': '₹'
 };
 
 /**
- * Toggle the mobile navigation menu.
+ * Update Dashboard Data
  */
-function toggleMobileMenu() {
-    const nav = document.querySelector('nav');
-    nav.classList.toggle('show');
-}
-
-/**
- * Handle currency change.
- */
-function changeCurrency(currency) {
-    currentCurrency = currency;
-    updatePricesInUI();
-
-    // If rate shopper is open, refresh it
-    const section = document.getElementById('rate-shopper-section');
-    if (section && section.style.display !== 'none') {
-        const hotelNameElement = document.getElementById('shopper-hotel-name');
-        const hotelName = hotelNameElement.innerText.replace('Rate Shopper - ', '');
-        const hotel = hotelLiveData.find(h => h.name === hotelName);
-        if (hotel) openRateShopper(hotel.id);
-    }
-}
-
-/**
- * Format price based on current currency.
- */
-function formatPrice(usdPrice) {
-    if (usdPrice === 'N/A' || isNaN(usdPrice)) return 'N/A';
-
-    const converted = usdPrice * exchangeRates[currentCurrency];
-    const symbol = currencySymbols[currentCurrency];
-
-    if (currentCurrency === 'THB' || currentCurrency === 'JPY' || currentCurrency === 'INR') {
-        return `${symbol}${Math.round(converted).toLocaleString()}`;
-    }
-    return `${symbol}${(Math.round(converted * 100) / 100).toFixed(2)}`;
-}
-
-/**
- * Fetch "Live" pricing data from our API.
- */
-async function fetchLivePrices() {
+async function refreshDashboard() {
+    showLoading(true);
     try {
         const response = await fetch('api/get_prices.php');
         const result = await response.json();
-        if (result.status === 'success') {
+        if (result.status === 'success' && result.data && result.data.length > 0) {
             hotelLiveData = result.data;
-            updatePricesInUI();
+            renderDashboard(hotelLiveData[0]);
+            resetTimer();
         }
     } catch (error) {
-        console.error("Failed to fetch live prices:", error);
+        console.error("Fetch error:", error);
+    } finally {
+        showLoading(false);
     }
 }
 
 /**
- * Update the DOM with newly fetched "live" prices.
+ * Smart Refresh - decides what to refresh
  */
-function updatePricesInUI() {
-    hotelLiveData.forEach(hotel => {
-        const card = document.getElementById(`hotel-${hotel.id}`);
-        if (!card) return;
-
-        // Update each site's price in the main grid
-        const priceList = card.querySelector('.price-list');
-        priceList.innerHTML = '';
-
-        for (const [site, data] of Object.entries(hotel.live_prices)) {
-            // Ensure data is the object {rate, url}
-            const price = (data && typeof data === 'object') ? data.rate : data;
-            const url = (data && typeof data === 'object') ? data.url : '#';
-
-            const li = document.createElement('li');
-            li.setAttribute('data-site', site);
-            li.style.cursor = 'pointer';
-            li.setAttribute('title', `Book on ${site}`);
-            li.onclick = () => window.open(url, '_blank');
-
-            li.innerHTML = `
-                <span class="site-name">${site}</span>
-                <span class="price-tag">${formatPrice(price)} <small class="live-pulse">LIVE</small></span>
-                <a href="${url}" target="_blank" class="view-btn" onclick="event.stopPropagation()">View Deal</a>
-            `;
-            priceList.appendChild(li);
-        }
-
-        // Update competitor mini-list
-        const compList = card.querySelector('.comp-mini-list');
-        if (compList) {
-            compList.innerHTML = '';
-            hotel.competitors.forEach(comp => {
-                const item = document.createElement('div');
-                item.className = 'comp-mini-item';
-                item.innerHTML = `
-                    <span class="comp-mini-name">${comp.name}</span>
-                    <span class="comp-mini-price">${formatPrice(comp.current_price)}</span>
-                `;
-                compList.appendChild(item);
-            });
-        }
-
-        // Add a visual indicator for live data if not present
-        if (!card.querySelector('.live-status')) {
-            const status = document.createElement('div');
-            status.className = 'live-status';
-            status.innerHTML = '<span class="pulse-dot"></span> Real-time prices synced';
-            card.querySelector('.hotel-image').appendChild(status);
-        }
-    });
-}
-
-/**
- * Toggle the price comparison dropdown for a specific hotel.
- */
-function toggleDropdown(hotelId) {
-    const card = document.getElementById(`hotel-${hotelId}`);
-    const isAlreadyActive = card.classList.contains('active');
-
-    // Close other dropdowns
-    document.querySelectorAll('.hotel-card').forEach(c => {
-        c.classList.remove('active');
-    });
-
-    // Toggle current
-    if (!isAlreadyActive) {
-        card.classList.add('active');
-        // Smooth scroll on mobile
-        if (window.innerWidth < 768) {
-            setTimeout(() => {
-                card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }, 300);
-        }
+async function smartRefresh() {
+    if (lastSearchQuery) {
+        await performSearch(lastSearchQuery);
+    } else {
+        await refreshDashboard();
     }
 }
 
 /**
- * Open the Rate Shopper comparison table for a specific hotel.
+ * Timer Logic
  */
-function openRateShopper(hotelId) {
-    const hotel = hotelLiveData.find(h => h.id === hotelId);
-    if (!hotel) return;
+function initTimer() {
+    if (refreshInterval) clearInterval(refreshInterval);
+    
+    refreshInterval = setInterval(() => {
+        refreshCountdown--;
+        
+        if (refreshCountdown < 0) {
+            refreshCountdown = 60; // Hard reset to prevent negative numbers
+        }
 
-    const section = document.getElementById('rate-shopper-section');
-    const hotelNameElem = document.getElementById('shopper-hotel-name');
-    const theadRow = document.getElementById('shopper-thead-row');
-    const tbody = document.getElementById('shopper-tbody');
-
-    hotelNameElem.innerText = `Rate Shopper - ${hotel.name}`;
-
-    // Clear previous table content
-    theadRow.innerHTML = '<th>OTA Name</th>';
-    tbody.innerHTML = '';
-
-    // ADDED: New Metric Headers
-    const visitorHeader = document.createElement('th');
-    visitorHeader.className = 'metric-header';
-    visitorHeader.innerHTML = `
-        <div class="th-wrapper">
-            <i class="ph-users-fill"></i>
-            <div class="th-label">
-                <span class="main-label">Visitors</span>
-                <span class="sub-label">Yesterday</span>
-            </div>
-        </div>
-    `;
-    theadRow.appendChild(visitorHeader);
-
-    const bookingHeader = document.createElement('th');
-    bookingHeader.className = 'metric-header';
-    bookingHeader.innerHTML = `
-        <div class="th-wrapper">
-            <i class="ph-shopping-cart-fill"></i>
-            <div class="th-label">
-                <span class="main-label">Bookings</span>
-                <span class="sub-label">Yesterday</span>
-            </div>
-        </div>
-    `;
-    theadRow.appendChild(bookingHeader);
-
-    // Define OTAs
-    const OTAs = [
-        "Hotel Website", "Agoda", "Expedia", "Booking.com", "MMT",
-        "Goibibo", "Trip.com", "Ticket.com", "Traveloka", "Hotels.com",
-        "Airbnb", "Hotelbeds.com", "Tripadvisor", "12go.asia"
-    ];
-
-    // Create Table Header: Main Hotel + Top 7 Competitors
-    const mainHotelHeader = document.createElement('th');
-    mainHotelHeader.innerText = 'Main Hotel Price';
-    mainHotelHeader.className = 'main-hotel-col main-header';
-    theadRow.appendChild(mainHotelHeader);
-
-    const displayCompetitors = hotel.competitors;
-    displayCompetitors.forEach(comp => {
-        const th = document.createElement('th');
-        th.innerText = comp.name;
-        th.className = 'comp-header';
-        theadRow.appendChild(th);
-    });
-
-    // Populate Table Rows
-    OTAs.forEach(ota => {
-        const tr = document.createElement('tr');
-
-        // OTA Name Cell
-        const otaNameCell = document.createElement('td');
-        otaNameCell.className = 'ota-name-cell';
-        otaNameCell.innerText = ota;
-        tr.appendChild(otaNameCell);
-
-        const otaData = hotel.live_prices[ota];
-        const visitors = otaData ? otaData.visitors_yesterday || '-' : '-';
-        const bookings = otaData ? otaData.bookings_yesterday || '-' : '-';
-
-        // Visitor Metric Cell
-        const visitorCell = document.createElement('td');
-        visitorCell.className = 'metric-cell visitor-count';
-        visitorCell.innerHTML = `<span>${visitors}</span>`;
-        tr.appendChild(visitorCell);
-
-        // Booking Metric Cell
-        const bookingCell = document.createElement('td');
-        bookingCell.className = 'metric-cell booking-count';
-        bookingCell.innerHTML = `<span>${bookings}</span>`;
-        tr.appendChild(bookingCell);
-
-        // Main Hotel Price + URL logic
-        const mainPriceCell = document.createElement('td');
-        mainPriceCell.className = 'main-hotel-col';
-
-        const price = (otaData && typeof otaData === 'object') ? otaData.rate : otaData;
-        const url = (otaData && typeof otaData === 'object') ? otaData.url : '#';
-
-        mainPriceCell.innerHTML = `
-            <span class="price-val" style="cursor:pointer; color:inherit; text-decoration:underline;" 
-                  onclick="window.open('${url}', '_blank')">
-                ${formatPrice(price)}
-            </span>
-        `;
-        tr.appendChild(mainPriceCell);
-
-        // Competitors logic
-        displayCompetitors.forEach(comp => {
-            const compPriceCell = document.createElement('td');
-            // Mock price if not exists
-            let compBase = comp.current_price || (180 + Math.floor(Math.random() * 120));
-            // Slight variance across OTAs
-            let variance = (Math.random() * 10 - 5);
-            let finalPrice = Math.round(compBase + variance);
-
-            if (finalPrice < price) {
-                compPriceCell.className = 'price-lower';
-            } else if (finalPrice > price) {
-                compPriceCell.className = 'price-higher';
-            }
-
-            compPriceCell.innerHTML = `<span class="price-val">${formatPrice(finalPrice)}</span>`;
-            tr.appendChild(compPriceCell);
-        });
-
-        tbody.appendChild(tr);
-    });
-
-    section.style.display = 'block';
-    section.scrollIntoView({ behavior: 'smooth' });
+        // Update UI
+        const timerEl = document.querySelector('.update-timer span');
+        if (timerEl) {
+            timerEl.innerText = `${refreshCountdown}s`;
+        }
+        
+        if (refreshCountdown === 0) {
+            smartRefresh();
+            refreshCountdown = 60; // Reset immediately after triggering refresh
+        }
+    }, 1000);
 }
 
-function closeRateShopper() {
-    document.getElementById('rate-shopper-section').style.display = 'none';
+function resetTimer() {
+    refreshCountdown = 60;
+    const timerEl = document.querySelector('.update-timer span');
+    if (timerEl) {
+        timerEl.innerText = `60s`;
+    }
 }
 
 /**
- * Search for hotels from SerpApi
+ * Perform Search
  */
-async function searchHotels(hotelName) {
-    if (!hotelName || hotelName.trim().length < 2) {
-        showSearchError('Hotel name must be at least 2 characters');
-        return;
-    }
-
-    showSearchLoading(true);
-    hideSearchError();
-
+async function performSearch(query) {
+    if (!query) return;
+    lastSearchQuery = query;
+    
+    showLoading(true);
     try {
-        const response = await fetch(`api/search_hotels.php?q=${encodeURIComponent(hotelName)}`);
+        const response = await fetch(`api/search_hotels.php?q=${encodeURIComponent(query)}`);
         const result = await response.json();
         
-        showSearchLoading(false);
-
         if (result.status === 'success' && result.data && result.data.length > 0) {
-            displaySearchResults(result.data);
+            // Process data to match dashboard expectations
+            hotelLiveData = result.data.map(hotel => {
+                // Ensure competitors exist for UI
+                if (!hotel.competitors) {
+                    hotel.competitors = [
+                        { name: 'Competitor A', price: 245, img: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=100&q=80' },
+                        { name: 'Competitor B', price: 310, img: 'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=100&q=80' },
+                        { name: 'Competitor C', price: 198, img: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=100&q=80' }
+                    ];
+                }
+                
+                // Ensure live_prices is consistent
+                if (!hotel.live_prices) hotel.live_prices = {};
+                
+                // If "Hotel Website" is missing, add it
+                if (!hotel.live_prices['Hotel Website']) {
+                    const firstPrice = Object.values(hotel.live_prices)[0];
+                    const baseRate = firstPrice ? firstPrice.rate : 250;
+                    hotel.live_prices['Hotel Website'] = {
+                        rate: Math.round(baseRate * 0.95),
+                        url: '#'
+                    };
+                }
+                
+                return hotel;
+            });
+            
+            renderDashboard(hotelLiveData[0]);
+            resetTimer();
+            
+            // Switch to dashboard view if search was performed from another view
+            switchView('dashboard', document.querySelector('.nav-link:first-child'));
         } else {
-            showSearchError(`No hotels found for "${hotelName}"`);
+            alert(result.message || "No hotels found. Try a different search term.");
         }
     } catch (error) {
-        showSearchLoading(false);
-        showSearchError('Error searching hotels. Please try again.');
-        console.error('Search error:', error);
+        console.error("Search error:", error);
+        alert("An error occurred while searching. Please try again.");
+    } finally {
+        showLoading(false);
     }
 }
 
 /**
- * Display search results as a comparison matrix (Main Hotel + Competitors vs OTAs)
+ * Render all dashboard components
  */
-function displaySearchResults(hotels) {
-    const container = document.getElementById('search-results');
-    const resultsSection = document.getElementById('search-results-container');
-    const defaultHotels = document.getElementById('default-hotels-container');
-    
-    if (!container || !resultsSection) {
-        console.error('Search result containers not found');
-        return;
+function renderDashboard(hotel) {
+    if (!hotel) return;
+
+    // 1. Update Title and Monitoring Info
+    const monitoringText = document.getElementById('monitoring-text');
+    if (monitoringText) {
+        monitoringText.innerText = `Monitoring ${hotel.name} across ${Object.keys(hotel.live_prices).length} OTA platforms`;
     }
+
+    // 2. Metrics & KPIs
+    const yourRate = hotel.live_prices['Hotel Website'] ? hotel.live_prices['Hotel Website'].rate : 378;
+    const marketRates = Object.values(hotel.live_prices).map(p => p.rate).filter(r => r > 0);
+    const avgRate = marketRates.length > 0 ? marketRates.reduce((a, b) => a + b, 0) / marketRates.length : yourRate;
+
+    updateMetric('your-rate-val', yourRate);
+    updateMetric('market-avg-val', avgRate);
+    updateMetric('recommended-val', yourRate * 1.06); 
+    document.getElementById('parity-issues-val').innerText = Math.floor(Math.random() * 10) + 5;
+
+    // 3. Rate Chart
+    const chartContainer = document.getElementById('rate-overview-container');
+    chartContainer.innerHTML = '';
     
+    const maxVal = Math.max(...marketRates, yourRate);
+
+    Object.entries(hotel.live_prices).forEach(([ota, data]) => {
+        const displayName = ota === 'Hotel Website' ? 'Website' : ota;
+        const rate = data.rate || 0;
+        const width = (rate / maxVal) * 100;
+        const diff = ((rate - yourRate) / yourRate * 100).toFixed(1);
+        const diffClass = diff >= 0 ? 'trend-up' : 'trend-down';
+        const diffPrefix = diff >= 0 ? '+' : '';
+
+        const row = document.createElement('div');
+        row.className = 'chart-row';
+        row.innerHTML = `
+            <div class="ota-info">${displayName}</div>
+            <div class="bar-wrapper">
+                <div class="bar-fill" style="width: ${width}%"></div>
+            </div>
+            <div class="price-text">${formatWithSymbol(rate)}</div>
+            <div class="trend-text ${diffClass}">${diffPrefix}${diff}%</div>
+        `;
+        chartContainer.appendChild(row);
+    });
+
+    // 4. Alerts
+    renderAlerts();
+
+    // 5. Competitors
+    renderCompetitors(hotel.competitors);
+}
+
+function updateMetric(id, value) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const symbol = currencySymbols[currentCurrency];
+    const converted = value * exchangeRates[currentCurrency];
+    el.innerText = `${symbol} ${Math.round(converted).toLocaleString()}`;
+}
+
+function renderAlerts() {
+    const container = document.getElementById('alerts-container');
     container.innerHTML = '';
-    
-    // Hide default hotels and show results
-    if (defaultHotels) defaultHotels.style.display = 'none';
-    resultsSection.style.display = 'block';
-    resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-    if (!hotels || hotels.length === 0) {
-        container.innerHTML = '<p style="text-align: center; color: var(--text-muted);">No hotels found</p>';
-        return;
-    }
-
-    // Define OTAs to show in rows
-    const OTAs = [
-        "Hotel Website", "Agoda", "Expedia", "Booking.com", "MMT",
-        "Goibibo", "Trip.com", "Ticket.com", "Traveloka", "Hotels.com",
-        "Airbnb", "Hotelbeds.com", "Tripadvisor", "12go.asia"
+    const mockAlerts = [
+        { type: 'high', icon: 'trend-down', hotel: 'Marina Bay Sands', msg: 'Agoda dropped rate by 12% to SGD 458', range: 'Agoda SGD 520 → SGD 458' },
+        { type: 'critical', icon: 'warning', hotel: 'The Grand Palace Hotel', msg: 'Your website rate is 8% higher than Booking.com', range: 'Booking.com SGD 390 → SGD 359' },
+        { type: 'medium', icon: 'shield', hotel: 'Raffles Hotel', msg: 'Trip.com showing SGD 645 vs website SGD 680', range: 'Trip.com SGD 680 → SGD 645' },
+        { type: 'low', icon: 'users', hotel: 'Fullerton Hotel', msg: '3 competitors reduced rates in last hour', range: 'Multiple' }
     ];
 
-    // Prepare hotels (Main + top 10 competitors)
-    // ONLY use hotels returned by the API
-    const finalDisplayHotels = hotels.slice(0, 11);
+    mockAlerts.forEach(alert => {
+        const item = document.createElement('div');
+        item.className = `alert-item alert-${alert.type}`;
+        item.innerHTML = `
+            <div class="alert-icon-box">
+                <i class="ph-fill ph-${alert.icon}"></i>
+            </div>
+            <div class="alert-content">
+                <h4>${alert.hotel} <span class="badge" style="font-size: 0.65rem; background:rgba(0,0,0,0.05); padding:2px 6px; border-radius:4px; margin-left:5px">${alert.type}</span></h4>
+                <p>${alert.msg}</p>
+                <div class="alert-range">${alert.range}</div>
+            </div>
+            <div class="alert-dot"></div>
+        `;
+        container.appendChild(item);
+    });
+}
 
-    // Create the matrix table container
-    const tableWrapper = document.createElement('div');
-    tableWrapper.className = 'search-matrix-wrapper';
+function renderCompetitors(competitors) {
+    const container = document.getElementById('competitors-row-container');
+    container.innerHTML = '';
     
+    if (!competitors || competitors.length === 0) return;
+
+    competitors.forEach(comp => {
+        const card = document.createElement('div');
+        card.className = 'comp-card';
+        card.innerHTML = `
+            <div class="comp-image" style="background-image: url('${comp.img}')"></div>
+            <div class="comp-info">
+                <h4>${comp.name}</h4>
+                <p>${formatWithSymbol(comp.price)}</p>
+                <span class="comp-unit">${currentCurrency} avg</span>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+function changeCurrency(val) {
+    currentCurrency = val;
+    if (hotelLiveData.length > 0) {
+        // Find which view is currently active
+        const activeView = document.querySelector('.view-section[style*="display: block"]');
+        const viewId = activeView ? activeView.id.replace('-view', '') : 'dashboard';
+        
+        // Re-render the relevant part
+        renderDashboard(hotelLiveData[0]);
+        
+        // If we are in a special view, re-render its specific data
+        if (viewId === 'rate-comparison') renderRateComparison();
+        if (viewId === 'smart-pricing') renderSmartPricing();
+        if (viewId === 'rate-parity') renderRateParity();
+        if (viewId === 'properties') renderProperties();
+    }
+}
+
+function showLoading(show) {
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) overlay.style.display = show ? 'flex' : 'none';
+}
+
+/**
+ * Switch between Dashboard and Rate Comparison views
+ */
+function switchView(viewId, element) {
+    // 1. Hide all views
+    document.querySelectorAll('.view-section').forEach(view => {
+        view.style.display = 'none';
+    });
+
+    // 2. Show selected view
+    document.getElementById(`${viewId}-view`).style.display = 'block';
+
+    // 3. Update active nav link
+    if (element) {
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.classList.remove('active');
+        });
+        element.classList.add('active');
+    }
+
+    // 4. Handle specific view rendering
+    if (viewId === 'rate-comparison') {
+        renderRateComparison();
+    } else if (viewId === 'smart-pricing') {
+        renderSmartPricing();
+    } else if (viewId === 'rate-parity') {
+        renderRateParity();
+    } else if (viewId === 'heatmap') {
+        renderHeatmap();
+    } else if (viewId === 'alerts') {
+        renderFullAlerts();
+    } else if (viewId === 'properties') {
+        renderProperties();
+    } else if (viewId === 'export') {
+        // Simple static view, but can be cleared/reset
+    }
+}
+
+/**
+ * Render Property Management List
+ */
+function renderProperties() {
+    const container = document.getElementById('properties-container');
+    container.innerHTML = '';
+
+    if (!hotelLiveData || hotelLiveData.length === 0) return;
+
+    hotelLiveData.forEach(hotel => {
+        const card = document.createElement('div');
+        card.className = 'panel property-item';
+        card.style.flexDirection = 'row';
+        card.style.alignItems = 'center';
+        card.style.justifyContent = 'space-between';
+        card.style.marginBottom = '1.5rem';
+
+        card.innerHTML = `
+            <div class="property-main-info" style="display:flex; align-items:center; gap:1.5rem">
+                <div class="property-icon-box" style="width:60px; height:60px; background:var(--primary-soft); color:var(--primary); border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.5rem">
+                    <i class="ph-fill ph-house"></i>
+                </div>
+                <div>
+                    <h3 style="margin:0">${hotel.name}</h3>
+                    <p style="color:var(--text-light); margin:0">${hotel.location}</p>
+                </div>
+            </div>
+            <div class="property-stats" style="display:flex; gap:2rem">
+                <div style="text-align:center">
+                    <span style="font-size:0.75rem; color:var(--text-light); display:block">Monitored OTAs</span>
+                    <strong style="font-size:1.1rem">${Object.keys(hotel.live_prices).length}</strong>
+                </div>
+                <div style="text-align:center">
+                    <span style="font-size:0.75rem; color:var(--text-light); display:block">Parity Score</span>
+                    <strong style="font-size:1.1rem; color:#10b981">94%</strong>
+                </div>
+            </div>
+            <div class="property-actions" style="display:flex; gap:0.5rem">
+                <button class="btn-refresh" style="background:#f3f4f6; color:var(--text-main); font-size:0.8rem">Edit</button>
+                <button class="btn-refresh" style="background:#fee2e2; color:#ef4444; font-size:0.8rem">Disable</button>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+/**
+ * Render Rate Parity Data
+ */
+function renderRateParity() {
+    const container = document.getElementById('parity-container');
+    container.innerHTML = '';
+
+    if (!hotelLiveData || hotelLiveData.length === 0) return;
+
     const table = document.createElement('table');
-    table.className = 'search-matrix-table';
+    table.className = 'comparison-matrix'; // Reuse matrix styles
+    table.innerHTML = `
+        <thead>
+            <tr>
+                <th>Hotel Name</th>
+                <th>Website Rate</th>
+                <th>Lowest OTA Rate</th>
+                <th>Parity Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="parity-tbody"></tbody>
+    `;
+    container.appendChild(table);
+    const tbody = document.getElementById('parity-tbody');
+
+    hotelLiveData.forEach(hotel => {
+        const yourRate = hotel.live_prices['Hotel Website'] ? hotel.live_prices['Hotel Website'].rate : 300;
+        const otaPrices = Object.entries(hotel.live_prices)
+            .filter(([site]) => site !== 'Hotel Website')
+            .map(([site, data]) => data.rate);
+        const minOta = Math.min(...otaPrices);
+        
+        const isParityViolated = minOta < yourRate;
+        const statusClass = isParityViolated ? 'trend-down' : 'trend-up';
+        const statusText = isParityViolated ? 'Violation (OTA Lower)' : 'In Parity';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="font-weight:700">${hotel.name}</td>
+            <td style="color:var(--primary); font-weight:700">${formatWithSymbol(yourRate)}</td>
+            <td>${formatWithSymbol(minOta)}</td>
+            <td><span class="${statusClass}" style="font-weight:700">${statusText}</span></td>
+            <td><button class="btn-apply" style="padding: 0.4rem 0.8rem; font-size:0.75rem;">Fix Parity</button></td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+/**
+ * Render Market Heatmap
+ */
+function renderHeatmap() {
+    const container = document.getElementById('heatmap-container');
+    container.innerHTML = '';
+
+    // Create a 30-day grid
+    for (let i = 1; i <= 30; i++) {
+        const day = document.createElement('div');
+        day.className = 'heatmap-cell';
+        // Mock intensity
+        const intensity = Math.floor(Math.random() * 100);
+        day.style.backgroundColor = `rgba(79, 70, 229, ${intensity / 100})`;
+        day.innerHTML = `
+            <span class="day-num">${i}</span>
+            <span class="intensity-val">${intensity}%</span>
+        `;
+        day.title = `Day ${i}: ${intensity}% Demand Intensity`;
+        container.appendChild(day);
+    }
+}
+
+/**
+ * Render Full Alerts Center
+ */
+function renderFullAlerts() {
+    const container = document.getElementById('alerts-full-container');
+    container.innerHTML = '';
+
+    const historicalAlerts = [
+        { type: 'critical', hotel: 'The Grand Palace', msg: 'Price mismatch on Booking.com for May 15-20', time: '2 hours ago' },
+        { type: 'high', hotel: 'Marina Bay Sands', msg: 'Competitor dropped price by 15%', time: '5 hours ago' },
+        { type: 'medium', hotel: 'Fullerton', msg: 'Parity restored on Agoda', time: 'Yesterday' },
+        { type: 'critical', hotel: 'Raffles Hotel', msg: 'Rate Parity Violation Detected on Expedia', time: '2 days ago' },
+        { type: 'medium', hotel: 'The Grand Palace', msg: 'Market demand surge predicted for next weekend', time: '3 days ago' }
+    ];
+
+    historicalAlerts.forEach(alert => {
+        const item = document.createElement('div');
+        item.className = `alert-item alert-${alert.type}`;
+        item.style.marginBottom = '1rem';
+        item.innerHTML = `
+            <div class="alert-icon-box">
+                <i class="ph-fill ph-${alert.type === 'critical' ? 'warning-octagon' : 'warning'}"></i>
+            </div>
+            <div class="alert-content">
+                <h4>${alert.hotel} <small style="color:var(--text-light)">• ${alert.time}</small></h4>
+                <p>${alert.msg}</p>
+            </div>
+            <button class="btn-apply" style="width:auto; padding: 0.4rem 1rem; margin-left:auto">View Details</button>
+        `;
+        container.appendChild(item);
+    });
+}
+
+/**
+ * Render the Smart Pricing Recommendations
+ */
+function renderSmartPricing() {
+    const container = document.getElementById('smart-pricing-container');
+    container.innerHTML = '';
+
+    if (!hotelLiveData || hotelLiveData.length === 0) return;
+
+    hotelLiveData.forEach(hotel => {
+        const yourRate = hotel.live_prices['Hotel Website'] ? hotel.live_prices['Hotel Website'].rate : 300;
+        const marketRates = Object.values(hotel.live_prices).map(p => p.rate).filter(r => r > 0);
+        const avgRate = marketRates.reduce((a, b) => a + b, 0) / marketRates.length;
+        
+        // Logic for suggestion: if current is lower than avg, suggest increasing slowly.
+        // If current is higher, suggest decreasing to stay competitive.
+        let suggestion = Math.round(avgRate * 0.98); 
+        const diff = suggestion - yourRate;
+        const diffText = diff >= 0 ? `+${diff}` : `${diff}`;
+        const diffClass = diff >= 0 ? 'text-green' : 'text-red';
+
+        const card = document.createElement('div');
+        card.className = 'smart-card';
+        card.innerHTML = `
+            <div class="smart-card-header">
+                <h3>${hotel.name}</h3>
+                <span class="conf-badge">98% Confidence</span>
+            </div>
+            <div class="smart-pricing-body">
+                <div class="pricing-stat-box">
+                    <span class="label">Current Rate</span>
+                    <span class="value">${formatWithSymbol(yourRate)}</span>
+                </div>
+                <div class="pricing-divider">
+                    <i class="ph ph-arrow-right"></i>
+                </div>
+                <div class="pricing-stat-box highlight">
+                    <span class="label">Suggested Rate</span>
+                    <span class="value">${formatWithSymbol(suggestion)}</span>
+                    <span class="change-tag ${diffClass}">${diffText}</span>
+                </div>
+            </div>
+            <div class="smart-card-details">
+                <div class="detail-row">
+                    <span>Market Average</span>
+                    <span>${formatWithSymbol(avgRate)}</span>
+                </div>
+                <div class="detail-row">
+                    <span>Competitor Avg</span>
+                    <span>${formatWithSymbol(avgRate - 10)}</span>
+                </div>
+            </div>
+            <div class="smart-card-actions">
+                <button class="btn-apply" onclick="alert('Pricing updated for ${hotel.name}!')">Apply Recommendation</button>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+function formatWithSymbol(val) {
+    const symbol = currencySymbols[currentCurrency];
+    const converted = val * exchangeRates[currentCurrency];
+    return `${symbol} ${Math.round(converted).toLocaleString()}`;
+}
+
+/**
+ * Render the Rate Comparison Matrix (Excel-style)
+ */
+function renderRateComparison() {
+    const table = document.getElementById('comparison-matrix-table');
+    const headerRow = document.getElementById('matrix-header-row');
+    const tbody = document.getElementById('matrix-body');
     
-    // Create Header (Hotel Names)
-    const thead = document.createElement('thead');
-    const headerRow = document.createElement('tr');
+    if (!hotelLiveData || hotelLiveData.length === 0) return;
+
+    // OTAs are the rows
+    const OTAs = ["Hotel Website", "Agoda", "Booking.com", "Trip.com", "Expedia", "Traveloka", "MakeMyTrip", "Airbnb"];
     
-    // OTA Name corner cell
-    const cornerTh = document.createElement('th');
-    cornerTh.innerText = 'OTA Name';
-    cornerTh.className = 'ota-header-cell';
-    headerRow.appendChild(cornerTh);
-    
-    // Hotel columns
-    finalDisplayHotels.forEach((hotel, index) => {
+    // Hotels are the columns
+    headerRow.innerHTML = '<th>OTA Platforms</th>';
+    hotelLiveData.slice(0, 10).forEach(hotel => { // Limit to 10 hotels for performance
         const th = document.createElement('th');
-        if (index === 0) {
-            th.innerHTML = `<div class="hotel-th-content"><span class="hotel-th-name">Main Hotel (Example ${hotel.name})</span></div>`;
-            th.className = 'main-hotel-th';
-        } else {
-            th.innerHTML = `<div class="hotel-th-content"><span class="hotel-th-name">Compitition ${index}</span><small class="orig-name">${hotel.name}</small></div>`;
-            th.className = 'comp-hotel-th';
-            if (index === 1) th.classList.add('highlight-comp');
-        }
+        th.innerText = hotel.name;
         headerRow.appendChild(th);
     });
-    
-    thead.appendChild(headerRow);
-    table.appendChild(thead);
-    
-    // Create Body (OTA Prices)
-    const tbody = document.createElement('tbody');
+
+    tbody.innerHTML = '';
     
     OTAs.forEach(ota => {
         const tr = document.createElement('tr');
         
-        // OTA name cell
+        // OTA Name Cell
         const otaTd = document.createElement('td');
         otaTd.className = 'ota-name-cell';
         otaTd.innerText = ota;
         tr.appendChild(otaTd);
         
-        // Price cells for each hotel
-        finalDisplayHotels.forEach((hotel, hIndex) => {
-            const priceTd = document.createElement('td');
-            priceTd.className = hIndex === 0 ? 'main-hotel-td' : 'comp-hotel-td';
+        // Hotel Price Cells
+        hotelLiveData.slice(0, 10).forEach(hotel => {
+            const td = document.createElement('td');
+            const data = hotel.live_prices[ota];
+            const rate = data ? data.rate : 0;
             
-            let priceData = null;
-            if (hotel.prices && hotel.prices[ota]) {
-                priceData = hotel.prices[ota];
-            } else if (hotel.prices) {
-                for (let provider in hotel.prices) {
-                    if (provider.toLowerCase().includes(ota.toLowerCase()) || 
-                        ota.toLowerCase().includes(provider.toLowerCase())) {
-                        priceData = hotel.prices[provider];
-                        break;
-                    }
+            if (rate > 0) {
+                const symbol = currencySymbols[currentCurrency];
+                const converted = rate * exchangeRates[currentCurrency];
+                td.innerText = `${symbol} ${Math.round(converted).toLocaleString()}`;
+                
+                // Highlight logic: if this is the lowest price for this hotel across OTAs
+                const pricesForHotel = Object.values(hotel.live_prices).map(p => p.rate).filter(r => r > 0);
+                const minForHotel = Math.min(...pricesForHotel);
+                if (rate === minForHotel) {
+                    td.classList.add('lowest-price-flag');
                 }
+            } else {
+                td.innerText = '-';
             }
-
-            let displayPrice = 'N/A';
-            let url = '#';
-            let rate = 0;
-            
-            if (priceData) {
-                rate = priceData.rate;
-                displayPrice = formatPrice(rate);
-                url = priceData.url || '#';
-            }
-            
-            priceTd.dataset.rate = rate;
-            priceTd.innerHTML = `<span class="matrix-price" onclick="if('${url}' !== '#') window.open('${url}', '_blank')">${displayPrice}</span>`;
-            tr.appendChild(priceTd);
+            tr.appendChild(td);
         });
         
         tbody.appendChild(tr);
     });
-
-    // Add Highlight for Lowest Price in each Column
-    setTimeout(() => {
-        const rowCount = tbody.rows.length;
-        const colCount = finalDisplayHotels.length;
-        
-        for (let j = 1; j <= colCount; j++) {
-            let minRate = Infinity;
-            let minTd = null;
-            
-            for (let i = 0; i < rowCount; i++) {
-                const td = tbody.rows[i].cells[j];
-                const rate = parseFloat(td.dataset.rate);
-                if (rate > 0 && rate < minRate) {
-                    minRate = rate;
-                    minTd = td;
-                }
-            }
-            
-            if (minTd) {
-                minTd.classList.add('lowest-price-match');
-                minTd.querySelector('.matrix-price').innerHTML += ' <i class="ph-tag-fill" title="Lowest in Market" style="color:#22c55e"></i>';
-            }
-        }
-    }, 100);
-
-    // Add Summary Rows
-    const summaryRows = ['Minimum', 'Maximum', 'Average'];
-    summaryRows.forEach(label => {
-        const tr = document.createElement('tr');
-        tr.className = 'summary-row';
-        
-        const labelTd = document.createElement('td');
-        labelTd.className = 'ota-name-cell summary-label';
-        labelTd.innerText = label;
-        tr.appendChild(labelTd);
-        
-        finalDisplayHotels.forEach((hotel, hIndex) => {
-            const sumTd = document.createElement('td');
-            sumTd.className = hIndex === 0 ? 'main-hotel-td' : 'comp-hotel-td';
-            
-            const rates = Object.values(hotel.prices).map(p => p.rate).filter(r => r > 0);
-            let value = 0;
-            
-            if (rates.length > 0) {
-                if (label === 'Minimum') value = Math.min(...rates);
-                else if (label === 'Maximum') value = Math.max(...rates);
-                else value = rates.reduce((a, b) => a + b, 0) / rates.length;
-            }
-            
-            sumTd.innerHTML = `<strong>${formatPrice(value)}</strong>`;
-            tr.appendChild(sumTd);
-        });
-        tbody.appendChild(tr);
-    });
-    
-    table.appendChild(tbody);
-    tableWrapper.appendChild(table);
-    container.appendChild(tableWrapper);
 }
 
-/**
- * Show/hide search loading state
- */
-function showSearchLoading(show) {
-    const loadingDiv = document.getElementById('search-loading');
-    if (loadingDiv) {
-        loadingDiv.style.display = show ? 'block' : 'none';
-    }
-}
-
-/**
- * Show search error message
- */
-function showSearchError(message) {
-    const errorDiv = document.getElementById('search-error');
-    if (errorDiv) {
-        errorDiv.textContent = message;
-        errorDiv.style.display = 'block';
-    }
-}
-
-/**
- * Hide search error message
- */
-function hideSearchError() {
-    const errorDiv = document.getElementById('search-error');
-    if (errorDiv) {
-        errorDiv.style.display = 'none';
-    }
-}
-
-/**
- * Clear search results and show default hotels
- */
-function clearSearch() {
-    const resultsSection = document.getElementById('search-results-container');
-    const defaultHotels = document.getElementById('default-hotels-container');
-    const hotelSearch = document.getElementById('hotel-search');
-    
-    if (hotelSearch) hotelSearch.value = '';
-    if (resultsSection) resultsSection.style.display = 'none';
-    if (defaultHotels) defaultHotels.style.display = 'block';
-    hideSearchError();
-    showSearchLoading(false);
-}
-
+// Initialization
 document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('currency-select').value = currentCurrency;
-    fetchLivePrices();
-    setInterval(fetchLivePrices, 60000);
-    
-    // Setup search event listeners
+    refreshDashboard();
+    initTimer();
+
+    const refreshBtn = document.getElementById('refresh-now');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => {
+            smartRefresh();
+        });
+    }
+
     const searchBtn = document.getElementById('search-btn');
-    const hotelSearch = document.getElementById('hotel-search');
-    const clearSearchBtn = document.getElementById('clear-search-btn');
-    
-    if (searchBtn && hotelSearch) {
+    if (searchBtn) {
         searchBtn.addEventListener('click', () => {
-            if(hotelSearch.value.trim()) {
-                searchHotels(hotelSearch.value.trim());
+            const query = document.getElementById('hotel-search').value;
+            if (query) {
+                performSearch(query);
+                resetTimer();
             }
         });
     }
-    
-    if (hotelSearch) {
-        hotelSearch.addEventListener('keypress', (e) => {
+
+    // Allow search on Enter key
+    const searchInput = document.getElementById('hotel-search');
+    if (searchInput) {
+        searchInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                if(hotelSearch.value.trim()) {
-                    searchHotels(hotelSearch.value.trim());
-                }
+                performSearch(searchInput.value);
             }
         });
-    }
-    
-    if (clearSearchBtn) {
-        clearSearchBtn.addEventListener('click', clearSearch);
     }
 });

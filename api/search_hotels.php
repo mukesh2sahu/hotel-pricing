@@ -56,7 +56,7 @@ function searchHotels($hotelName, $checkInDaysFromNow = 14) {
             if (!isset($hotelMap[$name])) {
                 $hotelMap[$name] = [
                     'name' => $name,
-                    'prices' => [], // To store OTA: price
+                    'live_prices' => [], // To store OTA: price
                     'source' => $ad['source'] ?? 'Unknown',
                     'link' => $ad['link'] ?? null,
                     'thumbnail' => $ad['thumbnail'] ?? null,
@@ -71,7 +71,7 @@ function searchHotels($hotelName, $checkInDaysFromNow = 14) {
                 // Remove everything except digits and decimal point
                 $price = preg_replace('/[^\d.]/', '', (string)$ad['price']);
                 if (!empty($price)) {
-                    $hotelMap[$name]['prices'][$ad['source']] = [
+                    $hotelMap[$name]['live_prices'][$ad['source']] = [
                         'rate' => (float)$price,
                         'url' => $ad['link'] ?? null
                     ];
@@ -87,7 +87,7 @@ function searchHotels($hotelName, $checkInDaysFromNow = 14) {
             if (!isset($hotelMap[$name])) {
                 $hotelMap[$name] = [
                     'name' => $name,
-                    'prices' => [],
+                    'live_prices' => [],
                     'source' => 'Google Hotels',
                     'link' => $property['link'] ?? null,
                     'thumbnail' => isset($property['images'][0]) ? $property['images'][0]['thumbnail'] : null,
@@ -104,7 +104,7 @@ function searchHotels($hotelName, $checkInDaysFromNow = 14) {
                     if (isset($pAd['price']) && isset($pAd['source'])) {
                         $pPrice = preg_replace('/[^\d.]/', '', (string)$pAd['price']);
                         if (!empty($pPrice)) {
-                            $hotelMap[$name]['prices'][$pAd['source']] = [
+                            $hotelMap[$name]['live_prices'][$pAd['source']] = [
                                 'rate' => (float)$pPrice,
                                 'url' => $pAd['link'] ?? null
                             ];
@@ -119,7 +119,7 @@ function searchHotels($hotelName, $checkInDaysFromNow = 14) {
                      if (isset($otherRate['rate']) && isset($otherRate['source'])) {
                         $pPrice = preg_replace('/[^\d.]/', '', (string)$otherRate['rate']);
                         if (!empty($pPrice)) {
-                            $hotelMap[$name]['prices'][$otherRate['source']] = [
+                            $hotelMap[$name]['live_prices'][$otherRate['source']] = [
                                 'rate' => (float)$pPrice,
                                 'url' => $otherRate['link'] ?? null
                             ];
@@ -131,16 +131,16 @@ function searchHotels($hotelName, $checkInDaysFromNow = 14) {
             // Add the lowest rate as a 'Google Hotels' price if no other price found for this OTA
             if (isset($property['rate_per_night']['lowest'])) {
                  $price = preg_replace('/[^\d.]/', '', (string)$property['rate_per_night']['lowest']);
-                 if (!empty($price) && !isset($hotelMap[$name]['prices']['Google Hotels'])) {
-                    $hotelMap[$name]['prices']['Google Hotels'] = [
+                 if (!empty($price) && !isset($hotelMap[$name]['live_prices']['Google Hotels'])) {
+                    $hotelMap[$name]['live_prices']['Google Hotels'] = [
                         'rate' => (float)$price,
                         'url' => $property['link'] ?? null
                     ];
                  }
             } else if (isset($property['rate_per_night']['extracted_lowest'])) {
                 $price = (float)$property['rate_per_night']['extracted_lowest'];
-                if ($price > 0 && !isset($hotelMap[$name]['prices']['Google Hotels'])) {
-                    $hotelMap[$name]['prices']['Google Hotels'] = [
+                if ($price > 0 && !isset($hotelMap[$name]['live_prices']['Google Hotels'])) {
+                    $hotelMap[$name]['live_prices']['Google Hotels'] = [
                         'rate' => $price,
                         'url' => $property['link'] ?? null
                     ];
@@ -222,6 +222,44 @@ if (($results === null || empty($results)) && strlen($hotelName) > 2) {
             $results = searchHotels($search);
             if ($results !== null && !empty($results)) {
                 break;
+            }
+        }
+    }
+}
+
+if ($results && !empty($results)) {
+    // Top-tier Deep Fetch for the requested hotel
+    $mainHotel = &$results[0];
+    
+    $params = [
+        "engine" => "google_hotels",
+        "q" => $mainHotel['name'],
+        "api_key" => SERP_API_KEY,
+        "currency" => "USD"
+    ];
+    
+    $url = "https://serpapi.com/search.json?" . http_build_query($params);
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    $detailResult = curl_exec($ch);
+    curl_close($ch);
+    
+    if ($detailResult) {
+        $detailData = json_decode($detailResult, true);
+        if (isset($detailData['ads']) && is_array($detailData['ads'])) {
+            foreach ($detailData['ads'] as $ad) {
+                if (isset($ad['price']) && isset($ad['source'])) {
+                    $pPrice = preg_replace('/[^\d.]/', '', (string)$ad['price']);
+                    if (!empty($pPrice)) {
+                        // Map to proper keys if needed
+                        $mainHotel['live_prices'][$ad['source']] = [
+                            'rate' => (float)$pPrice,
+                            'url' => $ad['link'] ?? null
+                        ];
+                    }
+                }
             }
         }
     }
