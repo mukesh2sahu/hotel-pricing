@@ -2,158 +2,69 @@
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 
-define('SERP_API_KEY', 'a67d0d35664e07f1bc469e5d69bdf20c95287fc99eda0c02b5da1e92589b0185');
+require_once __DIR__ . '/makcorps_client.php';
 
 /**
- * Search Hotels from SerpApi
+ * Search hotels from MakCorps RapidAPI using mapping + hotel comparison.
  */
 function searchHotels($hotelName, $checkInDaysFromNow = 14) {
-    if (!defined('SERP_API_KEY') || empty(SERP_API_KEY)) {
-        return null;
-    }
-    
     $checkIn = date('Y-m-d', strtotime('+' . $checkInDaysFromNow . ' days'));
     $checkOut = date('Y-m-d', strtotime('+' . ($checkInDaysFromNow + 1) . ' days'));
-    
-    $params = [
-        "engine" => "google_hotels",
-        "q" => $hotelName,
-        "check_in_date" => $checkIn,
-        "check_out_date" => $checkOut,
-        "adults" => "2",
-        "currency" => "USD",
-        "gl" => "us",
-        "hl" => "en",
-        "api_key" => SERP_API_KEY
-    ];
-    
-    $url = "https://serpapi.com/search.json?" . http_build_query($params);
-    
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-    $result = curl_exec($ch);
-    curl_close($ch);
-    
-    if (!$result) {
+
+    $mappingResponse = makcorpsMappingSearch($hotelName);
+    if (!$mappingResponse['ok']) {
+        error_log("MakCorps mapping error for '$hotelName': " . $mappingResponse['error']);
         return null;
     }
-    
-    $data = json_decode($result, true);
-    
-    if (isset($data['error'])) {
-        return null;
+
+    $mappingResults = $mappingResponse['data'];
+    if (!is_array($mappingResults) || empty($mappingResults)) {
+        return [];
     }
-    
+
     $hotels = [];
-    $hotelMap = []; // Grouping by hotel name to aggregate OTA prices
-    
-    // Extract hotels from ads section (these have OTA prices and provider names)
-    if (isset($data['ads']) && is_array($data['ads'])) {
-        foreach ($data['ads'] as $ad) {
-            $name = $ad['name'] ?? 'N/A';
-            if (!isset($hotelMap[$name])) {
-                $hotelMap[$name] = [
-                    'name' => $name,
-                    'prices' => [], // To store OTA: price
-                    'source' => $ad['source'] ?? 'Unknown',
-                    'link' => $ad['link'] ?? null,
-                    'thumbnail' => $ad['thumbnail'] ?? null,
-                    'rating' => $ad['overall_rating'] ?? null,
-                    'reviews' => $ad['reviews'] ?? null,
-                    'hotel_class' => $ad['hotel_class'] ?? null,
-                    'amenities' => $ad['amenities'] ?? []
-                ];
-            }
-            
-            if (isset($ad['price']) && isset($ad['source'])) {
-                // Remove everything except digits and decimal point
-                $price = preg_replace('/[^\d.]/', '', (string)$ad['price']);
-                if (!empty($price)) {
-                    $hotelMap[$name]['prices'][$ad['source']] = [
-                        'rate' => (float)$price,
-                        'url' => $ad['link'] ?? null
-                    ];
-                }
-            }
-        }
-    }
-    
-    // Also get hotels from properties section
-    if (isset($data['properties']) && is_array($data['properties'])) {
-        foreach ($data['properties'] as $property) {
-            $name = $property['name'] ?? 'N/A';
-            if (!isset($hotelMap[$name])) {
-                $hotelMap[$name] = [
-                    'name' => $name,
-                    'prices' => [],
-                    'source' => 'Google Hotels',
-                    'link' => $property['link'] ?? null,
-                    'thumbnail' => isset($property['images'][0]) ? $property['images'][0]['thumbnail'] : null,
-                    'rating' => $property['overall_rating'] ?? null,
-                    'reviews' => $property['reviews'] ?? null,
-                    'hotel_class' => $property['hotel_class'] ?? null,
-                    'amenities' => $property['amenities'] ?? []
-                ];
-            }
-            
-            // Add properties-specific prices if available (Google often nests OTA prices here)
-            if (isset($property['ads']) && is_array($property['ads'])) {
-                foreach ($property['ads'] as $pAd) {
-                    if (isset($pAd['price']) && isset($pAd['source'])) {
-                        $pPrice = preg_replace('/[^\d.]/', '', (string)$pAd['price']);
-                        if (!empty($pPrice)) {
-                            $hotelMap[$name]['prices'][$pAd['source']] = [
-                                'rate' => (float)$pPrice,
-                                'url' => $pAd['link'] ?? null
-                            ];
-                        }
-                    }
-                }
-            }
 
-            // Also check other_rate_per_night if it exists
-            if (isset($property['other_rate_per_night']) && is_array($property['other_rate_per_night'])) {
-                foreach ($property['other_rate_per_night'] as $otherRate) {
-                     if (isset($otherRate['rate']) && isset($otherRate['source'])) {
-                        $pPrice = preg_replace('/[^\d.]/', '', (string)$otherRate['rate']);
-                        if (!empty($pPrice)) {
-                            $hotelMap[$name]['prices'][$otherRate['source']] = [
-                                'rate' => (float)$pPrice,
-                                'url' => $otherRate['link'] ?? null
-                            ];
-                        }
-                    }
-                }
-            }
-            
-            // Add the lowest rate as a 'Google Hotels' price if no other price found for this OTA
-            if (isset($property['rate_per_night']['lowest'])) {
-                 $price = preg_replace('/[^\d.]/', '', (string)$property['rate_per_night']['lowest']);
-                 if (!empty($price) && !isset($hotelMap[$name]['prices']['Google Hotels'])) {
-                    $hotelMap[$name]['prices']['Google Hotels'] = [
-                        'rate' => (float)$price,
-                        'url' => $property['link'] ?? null
-                    ];
-                 }
-            } else if (isset($property['rate_per_night']['extracted_lowest'])) {
-                $price = (float)$property['rate_per_night']['extracted_lowest'];
-                if ($price > 0 && !isset($hotelMap[$name]['prices']['Google Hotels'])) {
-                    $hotelMap[$name]['prices']['Google Hotels'] = [
-                        'rate' => $price,
-                        'url' => $property['link'] ?? null
-                    ];
-                }
-            }
+    foreach (array_slice($mappingResults, 0, 11) as $mappedHotel) {
+        if (!is_array($mappedHotel)) {
+            continue;
         }
+
+        $hotelId = $mappedHotel['document_id'] ?? null;
+        if (!$hotelId) {
+            continue;
+        }
+
+        $hotelResponse = makcorpsHotelComparison($hotelId, $checkIn, $checkOut, 'USD', 2, 1);
+        if (!$hotelResponse['ok']) {
+            error_log("MakCorps hotel error for '$hotelName' [$hotelId]: " . $hotelResponse['error']);
+            continue;
+        }
+
+        $prices = makcorpsNormalizeComparison($hotelResponse['data']['comparison'] ?? []);
+        if (empty($prices)) {
+            continue;
+        }
+
+        $details = $mappedHotel['details'] ?? [];
+        $hotels[] = [
+            'id' => (string)$hotelId,
+            'name' => $mappedHotel['name'] ?? $hotelName,
+            'prices' => $prices,
+            'source' => 'MakCorps RapidAPI',
+            'link' => null,
+            'thumbnail' => null,
+            'rating' => $details['rating'] ?? null,
+            'reviews' => $details['reviews'] ?? null,
+            'hotel_class' => $details['hotel_class'] ?? null,
+            'amenities' => [],
+            'location' => trim(implode(', ', array_filter([
+                $details['address'] ?? null,
+                $details['parent_name'] ?? null,
+                $details['grandparent_name'] ?? null
+            ])))
+        ];
     }
 
-    // Convert map to indexed array
-    foreach ($hotelMap as $hotel) {
-        $hotels[] = $hotel;
-    }
-    
     return $hotels;
 }
 
@@ -234,13 +145,15 @@ if ($results === null || empty($results)) {
     echo json_encode([
         "status" => "success",
         "data" => [],
-        "message" => "No hotels found for: " . htmlspecialchars($hotelName) . ". " . $suggestion
+        "message" => "No hotels found for: " . htmlspecialchars($hotelName) . ". " . $suggestion,
+        "source" => "MakCorps RapidAPI"
     ]);
 } else {
     echo json_encode([
         "status" => "success",
         "data" => $results,
-        "count" => count($results)
+        "count" => count($results),
+        "source" => "MakCorps RapidAPI"
     ]);
 }
 ?>

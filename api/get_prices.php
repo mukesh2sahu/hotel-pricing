@@ -3,6 +3,7 @@ header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 
 include __DIR__ . '/../hotels.php';
+require_once __DIR__ . '/makcorps_client.php';
 
 $xoteloDown = false;
 
@@ -10,91 +11,50 @@ $xoteloDown = false;
 // CONFIGURATION
 // ==========================================
 
-define('SERP_API_KEY', 'a67d0d35664e07f1bc469e5d69bdf20c95287fc99eda0c02b5da1e92589b0185'); // Get key at serpapi.com for Google Hotels API
-
-
 /**
- * Fetch Live Rates using Google Hotels API (via SerpApi)
+ * Fetch live rates using MakCorps mapping + hotel comparison.
  */
-function fetchGoogleHotelsRates($hotelName) {
-    if (!defined('SERP_API_KEY') || empty(SERP_API_KEY)) {
-        return null; // Fallback
-    }
-    
+function fetchMakCorpsRates($hotelName) {
     $checkIn = date('Y-m-d', strtotime('+14 days'));
     $checkOut = date('Y-m-d', strtotime('+15 days'));
-    
-    $params = [
-        "engine" => "google_hotels",
-        "q" => $hotelName,
-        "check_in_date" => $checkIn,
-        "check_out_date" => $checkOut,
-        "adults" => "2",
-        "currency" => "USD",
-        "gl" => "us",
-        "hl" => "en",
-        "api_key" => SERP_API_KEY
-    ];
-    
-    $url = "https://serpapi.com/search.json?" . http_build_query($params);
-    
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 6);
-    $result = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curlError = curl_error($ch);
-    curl_close($ch);
-    
-    if (!$result) {
-        error_log("SerpApi Error for '$hotelName': cURL failed - $curlError (HTTP $httpCode)");
+
+    $mappingResponse = makcorpsMappingSearch($hotelName);
+    if (!$mappingResponse['ok']) {
+        error_log("MakCorps mapping error for '$hotelName': " . $mappingResponse['error']);
         return null;
     }
-    
-    $data = json_decode($result, true);
-    
-    // Check for API errors
-    if (isset($data['error'])) {
-        error_log("SerpApi Error for '$hotelName': " . $data['error']);
+
+    $mappingResults = $mappingResponse['data'];
+    if (!is_array($mappingResults) || empty($mappingResults)) {
         return null;
     }
-    
+
+    $hotelId = $mappingResults[0]['document_id'] ?? null;
+    if (!$hotelId) {
+        return null;
+    }
+
+    $hotelResponse = makcorpsHotelComparison($hotelId, $checkIn, $checkOut, 'USD', 2, 1);
+    if (!$hotelResponse['ok']) {
+        error_log("MakCorps hotel error for '$hotelName' [$hotelId]: " . $hotelResponse['error']);
+        return null;
+    }
+
+    $prices = makcorpsNormalizeComparison($hotelResponse['data']['comparison'] ?? []);
+    if (empty($prices)) {
+        return null;
+    }
+
     $rates = [];
-    
-    // First, try to get prices from the ads section (most reliable with provider names)
-    if (isset($data['ads']) && is_array($data['ads'])) {
-        foreach ($data['ads'] as $ad) {
-            if (isset($ad['price']) && isset($ad['source'])) {
-                // Extract numeric price from string like "$89"
-                $priceStr = str_replace('$', '', (string)$ad['price']);
-                $price = (float)$priceStr;
-                
-                $rates[] = [
-                    'provider' => $ad['source'],
-                    'price' => round($price, 0),
-                    'url' => $ad['link'] ?? null
-                ];
-            }
-        }
+    foreach ($prices as $provider => $priceData) {
+        $rates[] = [
+            'provider' => $provider,
+            'price' => round((float)$priceData['rate'], 0),
+            'url' => $priceData['url'] ?? null
+        ];
     }
-    
-    // If no ads found, try properties section
-    if (empty($rates) && isset($data['properties']) && is_array($data['properties'])) {
-        foreach (array_slice($data['properties'], 0, 3) as $property) {
-            if (isset($property['rate_per_night']['extracted_lowest'])) {
-                $price = (float)$property['rate_per_night']['extracted_lowest'];
-                
-                $rates[] = [
-                    'provider' => 'Google Hotels',
-                    'price' => round($price, 0),
-                    'url' => $property['link'] ?? null
-                ];
-            }
-        }
-    }
-    
-    return count($rates) > 0 ? $rates : null;
+
+    return $rates;
 }
 
 
@@ -111,10 +71,9 @@ foreach ($hotels as $hotel) {
     if ($hotelId === null || $hotel['id'] === $hotelId) {
         
         $prices = [];
-        $googleRates = fetchGoogleHotelsRates($hotel['name']);
+        $googleRates = fetchMakCorpsRates($hotel['name']);
         
         if ($googleRates) {
-            // Map Google Hotels API rates (via Serpapi)
             foreach ($googleRates as $rate) {
                 $siteName = ucfirst($rate['provider']);
                 if (stripos($siteName, 'Booking') !== false) $siteName = 'Booking.com';
@@ -188,7 +147,7 @@ $finalOutput = json_encode([
     "status" => "success",
     "timestamp" => date('Y-m-d H:i:s'),
     "data" => $response,
-    "source" => "SkyCompare Engine (Real API Data)"
+    "source" => "SkyCompare Engine (MakCorps RapidAPI)"
 ]);
 
 echo $finalOutput;
