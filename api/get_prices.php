@@ -5,6 +5,7 @@ header('Access-Control-Allow-Origin: *');
 include __DIR__ . '/../hotels.php';
 
 $xoteloDown = false;
+
 // ==========================================
 // CONFIGURATION
 // ==========================================
